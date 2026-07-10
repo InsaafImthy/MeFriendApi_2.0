@@ -168,18 +168,8 @@ namespace MeFriendApi.Services.Services
             };
 
             client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
+                new AuthenticationHeaderValue("Bearer", token); 
 
-            //if (!string.IsNullOrWhiteSpace(etag))
-            //{
-            //    client.DefaultRequestHeaders.TryAddWithoutValidation(
-            //        "If-Match",
-            //        etag);
-            //}
-            //else
-            //{
-
-            //}
             client.DefaultRequestHeaders.TryAddWithoutValidation(
                                 "If-Match",
                                 "*");
