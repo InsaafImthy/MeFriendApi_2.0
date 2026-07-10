@@ -1,0 +1,338 @@
+﻿using MeFriendApi.Domain.Dto;
+using MeFriendApi.Domain.Dto.Helpers;
+using MeFriendApi.Domain.DTO;
+using MeFriendApi.Domain.Exceptions;
+using MeFriendApi.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Identity.Client;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using static MeFriendApi.Domain.Constants;
+
+namespace MeFriendApi.Services.Services
+{
+    public class D365CommonService : ID365CommonService
+    {
+        private readonly IConfiguration _configuration;
+        public D365CommonService(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+        public async Task<string> GetAccessToken()
+        {
+            var app = ConfidentialClientApplicationBuilder.Create(_configuration["AzureAd:ClientId"])
+                .WithClientSecret(_configuration["AzureAd:ClientSecret"])
+                .WithAuthority($"https://login.microsoftonline.com/{_configuration["AzureAd:TenantId"]}")
+                .Build();
+
+            var scopes = new[] { "https://api.businesscentral.dynamics.com/.default" };
+
+            var result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
+
+            return result.AccessToken;
+        }
+
+        public async Task<List<T>> GetDataFromBc<T>(
+            string apiPath,
+            string? filter = "",
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2)
+        {
+            try
+            {
+                var token = await GetAccessToken();
+
+                using var client = new HttpClient();
+
+                var protocolPath = bcWebServiceProtocol switch
+                {
+                    BcWebServiceProtocol.V2 => "api/v2.0",
+                    BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
+                    BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
+                    _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+                };
+
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+
+                if (!string.IsNullOrWhiteSpace(filter))
+                {
+                    url += filter;
+                }
+
+                var response = await client.GetAsync(url);
+
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                using var document = JsonDocument.Parse(json);
+
+                var root = document.RootElement;
+
+                // Collection response
+                if (root.TryGetProperty("value", out var valueElement))
+                {
+                    var result =
+                        JsonSerializer.Deserialize<BcODataResponse<T>>(json, options);
+
+                    return result?.Value ?? new List<T>();
+                }
+
+                // Single object response
+                var singleObject =
+                    JsonSerializer.Deserialize<T>(json, options);
+
+                return singleObject != null
+                    ? new List<T> { singleObject }
+                    : new List<T>();
+            }
+            catch (Exception)
+            {
+                throw new InternalException("Failed to get response");
+            }
+        }
+        
+        public async Task<TResponse?> PostDataToBc<TRequest, TResponse>(
+            string apiPath,
+            TRequest payload,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
+        {
+            try
+            {
+                var token = await GetAccessToken();
+
+                using var client = new HttpClient();
+
+                var protocolPath = bcWebServiceProtocol switch
+                {
+                    BcWebServiceProtocol.V2 => "api/v2.0",
+                    BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
+                    BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
+                    _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+                };
+
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                var json = JsonSerializer.Serialize(payload, options);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync(url, content);
+                response.EnsureSuccessStatusCode();
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+
+                return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }catch(Exception ex)
+            {
+                throw;
+            }   
+        }
+        public async Task<TResponse?> PatchDataToBc<TRequest, TResponse>(
+            string apiPath,
+            TRequest payload,
+            string? etag = null,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
+        {
+            var token = await GetAccessToken();
+
+            using var client = new HttpClient();
+
+            var protocolPath = bcWebServiceProtocol switch
+            {
+                BcWebServiceProtocol.V2 => "api/v2.0",
+                BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
+                BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
+                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+            };
+
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            //if (!string.IsNullOrWhiteSpace(etag))
+            //{
+            //    client.DefaultRequestHeaders.TryAddWithoutValidation(
+            //        "If-Match",
+            //        etag);
+            //}
+            //else
+            //{
+
+            //}
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                                "If-Match",
+                                "*");
+            var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            var json = JsonSerializer.Serialize(payload, options);
+
+            var content = new StringContent(
+                json,
+                Encoding.UTF8,
+                "application/json");
+
+            var request = new HttpRequestMessage(
+                HttpMethod.Patch,
+                url)
+            {
+                Content = content
+            };
+
+            var response = await client.SendAsync(request);
+
+            response.EnsureSuccessStatusCode();
+
+            // Some BC PATCH APIs return 204 NoContent
+            if (response.Content == null)
+                return default;
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+
+            if (string.IsNullOrWhiteSpace(responseJson))
+                return default;
+
+            return JsonSerializer.Deserialize<TResponse>(
+                responseJson,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+        }
+        public async Task DeleteDataFromBc(
+            string apiPath,
+            string? etag = null,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
+        {
+            var token = await GetAccessToken();
+
+            using var client = new HttpClient();
+
+            var protocolPath = bcWebServiceProtocol switch
+            {
+                BcWebServiceProtocol.V2 => "api/v2.0",
+                BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
+                BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
+                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+            };
+
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                                "If-Match",
+                                "*");
+
+            var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+
+            var response = await client.DeleteAsync(url);
+
+            response.EnsureSuccessStatusCode();
+        }
+
+        public async Task<BcAttachmentResponseDto?> UploadAttachmentsToBcAsync(
+            string filePathWithItemId,
+            IFormFile file,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                    throw new BadRequestException("File is required.");
+
+                var token = await GetAccessToken();
+
+                using var client = new HttpClient();
+
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                var protocolPath = bcWebServiceProtocol switch
+                {
+                    BcWebServiceProtocol.V2 =>
+                        "api/v2.0",
+
+                    BcWebServiceProtocol.ODataV4 =>
+                        $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
+
+                    BcWebServiceProtocol.V1 =>
+                        $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
+
+                    _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+                };
+
+                var url =
+                    $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{filePathWithItemId}/Attachments";
+
+                await using var stream = file.OpenReadStream();
+
+                using var content = new MultipartFormDataContent();
+
+                var fileContent = new StreamContent(stream);
+
+                fileContent.Headers.ContentType =
+                    new MediaTypeHeaderValue(
+                        string.IsNullOrWhiteSpace(file.ContentType)
+                            ? "application/octet-stream"
+                            : file.ContentType);
+
+                content.Add(
+                    fileContent,
+                    "file",
+                    file.FileName);
+
+                var response = await client.PostAsync(url, content);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new InternalException(
+                        $"BC attachment upload failed. Status: {(int)response.StatusCode} - {responseContent}");
+                }
+
+                if (string.IsNullOrWhiteSpace(responseContent))
+                    return null;
+
+                return JsonSerializer.Deserialize<BcAttachmentResponseDto>(
+                    responseContent,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+            catch (Exception ex)
+            {
+                throw new InternalException(
+                    $"Failed to upload attachment to Business Central: {ex.Message}");
+            }
+        }
+    }
+}
+
