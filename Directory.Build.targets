@@ -1,0 +1,6 @@
+<Project>
+  <Target Name="EnsureNet8TargetFramework" BeforeTargets="CoreCompile">
+    <Error Condition="'$(TargetFramework)' != 'net8.0'"
+           Text="$(MSBuildProjectName) must target net8.0 for the IIS hosting environment. Current TargetFramework is $(TargetFramework)." />
+  </Target>
+</Project>
