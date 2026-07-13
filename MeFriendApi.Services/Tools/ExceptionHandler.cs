@@ -17,7 +17,7 @@ namespace MeFriendApi.Services.Tools
                 else if (exception is NotFoundException) return new ResponseModel { StatusCode = 404, Message = exception.Message };
                 else return new ResponseModel { StatusCode = 500 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return new ResponseModel { StatusCode = 500 };
             }

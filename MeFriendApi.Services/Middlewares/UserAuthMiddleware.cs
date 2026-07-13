@@ -1,10 +1,6 @@
 ﻿using MeFriendApi.Domain;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Text;
 using static MeFriendApi.Domain.Dto.Helpers.CommonDto;
 
 namespace MeFriendApi.Services.Middlewares
@@ -18,10 +14,9 @@ namespace MeFriendApi.Services.Middlewares
         {
             try
             {
-                var path = context.Request.Path.Value?.ToLower() ?? "";
                 await next(context);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.ContentType = "application/json";

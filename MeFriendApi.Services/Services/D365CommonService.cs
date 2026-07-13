@@ -17,9 +17,12 @@ namespace MeFriendApi.Services.Services
     public class D365CommonService : ID365CommonService
     {
         private readonly IConfiguration _configuration;
-        public D365CommonService(IConfiguration configuration)
+        private readonly IHttpClientFactory _httpClientFactory;
+
+        public D365CommonService(IConfiguration configuration, IHttpClientFactory httpClientFactory)
         {
             _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
         }
         public async Task<string> GetAccessToken()
         {
@@ -44,7 +47,7 @@ namespace MeFriendApi.Services.Services
             {
                 var token = await GetAccessToken();
 
-                using var client = new HttpClient();
+                var client = CreateBusinessCentralClient(token);
 
                 var protocolPath = bcWebServiceProtocol switch
                 {
@@ -53,9 +56,6 @@ namespace MeFriendApi.Services.Services
                     BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
                     _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
                 };
-
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", token);
 
                 var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
 
@@ -107,57 +107,9 @@ namespace MeFriendApi.Services.Services
             TRequest payload,
             BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
         {
-            try
-            {
-                var token = await GetAccessToken();
-
-                using var client = new HttpClient();
-
-                var protocolPath = bcWebServiceProtocol switch
-                {
-                    BcWebServiceProtocol.V2 => "api/v2.0",
-                    BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
-                    BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
-                    _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
-                };
-
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", token);
-
-                var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
-
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                };
-
-                var json = JsonSerializer.Serialize(payload, options);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await client.PostAsync(url, content);
-                response.EnsureSuccessStatusCode();
-
-                var responseJson = await response.Content.ReadAsStringAsync();
-
-                return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            }catch(Exception ex)
-            {
-                throw;
-            }   
-        }
-        public async Task<TResponse?> PatchDataToBc<TRequest, TResponse>(
-            string apiPath,
-            TRequest payload,
-            string? etag = null,
-            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
-        {
             var token = await GetAccessToken();
 
-            using var client = new HttpClient();
+            var client = CreateBusinessCentralClient(token);
 
             var protocolPath = bcWebServiceProtocol switch
             {
@@ -167,8 +119,44 @@ namespace MeFriendApi.Services.Services
                 _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
             };
 
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token); 
+            var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            var json = JsonSerializer.Serialize(payload, options);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await client.PostAsync(url, content);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+
+            return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        public async Task<TResponse?> PatchDataToBc<TRequest, TResponse>(
+            string apiPath,
+            TRequest payload,
+            string? etag = null,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
+        {
+            var token = await GetAccessToken();
+
+            var client = CreateBusinessCentralClient(token);
+
+            var protocolPath = bcWebServiceProtocol switch
+            {
+                BcWebServiceProtocol.V2 => "api/v2.0",
+                BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
+                BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
+                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+            };
 
             client.DefaultRequestHeaders.TryAddWithoutValidation(
                                 "If-Match",
@@ -222,7 +210,7 @@ namespace MeFriendApi.Services.Services
         {
             var token = await GetAccessToken();
 
-            using var client = new HttpClient();
+            var client = CreateBusinessCentralClient(token);
 
             var protocolPath = bcWebServiceProtocol switch
             {
@@ -231,9 +219,6 @@ namespace MeFriendApi.Services.Services
                 BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
                 _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
             };
-
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
 
             client.DefaultRequestHeaders.TryAddWithoutValidation(
                                 "If-Match",
@@ -258,10 +243,7 @@ namespace MeFriendApi.Services.Services
 
                 var token = await GetAccessToken();
 
-                using var client = new HttpClient();
-
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", token);
+                var client = CreateBusinessCentralClient(token);
 
                 var protocolPath = bcWebServiceProtocol switch
                 {
@@ -323,6 +305,13 @@ namespace MeFriendApi.Services.Services
                     $"Failed to upload attachment to Business Central: {ex.Message}");
             }
         }
+
+        private HttpClient CreateBusinessCentralClient(string token)
+        {
+            var client = _httpClientFactory.CreateClient(nameof(D365CommonService));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            return client;
+        }
     }
 }
-
