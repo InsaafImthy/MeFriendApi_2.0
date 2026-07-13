@@ -9,6 +9,7 @@ namespace MeFriendApi.Services
         public static void RegisterService(IServiceCollection services)
         {
             services.AddScoped<ID365CommonService, D365CommonService>();
+            services.AddScoped<ICustomersService, CustomersService>();
         }
     }
 }

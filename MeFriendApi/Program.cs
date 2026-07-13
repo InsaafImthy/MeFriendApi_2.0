@@ -1,4 +1,5 @@
 using MeFriendApi.Services;
+using MeFriendApi.Services.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 ServiceRegistration.RegisterService(builder.Services);
@@ -16,7 +17,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseMiddleware<UserAuthMiddleware>();
 
 app.MapControllers();
 
