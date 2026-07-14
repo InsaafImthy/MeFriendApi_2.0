@@ -25,5 +25,20 @@ namespace MeFriendApi.Services.Services
                 throw new Exception($"Error retrieving customers: {ex.Message}", ex);
             }
         }
+
+        public async Task<Customers?> CreateCustomerAsync(CreateCustomerRequest request)
+        {
+            try
+            {
+                return await _d365CommonService.PostDataToBc<CreateCustomerRequest, Customers>(
+                    "/customers",
+                    request,
+                    BcWebServiceProtocol.V1);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error creating customer: {ex.Message}", ex);
+            }
+        }
     }
 }

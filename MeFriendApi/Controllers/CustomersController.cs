@@ -1,4 +1,5 @@
-﻿using MeFriendApi.Services.Interfaces;
+﻿using MeFriendApi.Domain.Dto;
+using MeFriendApi.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MeFriendApi.Controllers
@@ -12,6 +13,7 @@ namespace MeFriendApi.Controllers
         {
             _customersService = customersService;
         }
+
         [HttpGet]
         public async Task<IActionResult>
             GetCustomers()
@@ -20,6 +22,20 @@ namespace MeFriendApi.Controllers
             {
                 var customers = await _customersService.GetCustomers();
                 return Ok(customers);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateCustomer(CreateCustomerRequest request)
+        {
+            try
+            {
+                var customer = await _customersService.CreateCustomerAsync(request);
+                return Ok(customer);
             }
             catch (Exception ex)
             {
