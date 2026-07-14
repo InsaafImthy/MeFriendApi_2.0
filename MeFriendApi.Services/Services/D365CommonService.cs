@@ -66,7 +66,7 @@ namespace MeFriendApi.Services.Services
 
                 var response = await client.GetAsync(url);
 
-                response.EnsureSuccessStatusCode();
+                await EnsureBusinessCentralSuccessAsync(response, $"GET {apiPath}");
 
                 var json = await response.Content.ReadAsStringAsync();
 
@@ -96,9 +96,9 @@ namespace MeFriendApi.Services.Services
                     ? new List<T> { singleObject }
                     : new List<T>();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw new InternalException("Failed to get response");
+                throw new InternalException($"Failed to get response: {ex.Message}", ex);
             }
         }
         
@@ -131,7 +131,7 @@ namespace MeFriendApi.Services.Services
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await client.PostAsync(url, content);
-            response.EnsureSuccessStatusCode();
+            await EnsureBusinessCentralSuccessAsync(response, $"POST {apiPath}");
 
             var responseJson = await response.Content.ReadAsStringAsync();
 
@@ -154,7 +154,7 @@ namespace MeFriendApi.Services.Services
                 var url = BuildNamedODataServiceUrl(serviceName, queryString);
 
                 var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
+                await EnsureBusinessCentralSuccessAsync(response, $"GET ODataV4/{serviceName}");
 
                 var json = await response.Content.ReadAsStringAsync();
 
@@ -209,7 +209,7 @@ namespace MeFriendApi.Services.Services
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var response = await client.PostAsync(url, content);
-                response.EnsureSuccessStatusCode();
+                await EnsureBusinessCentralSuccessAsync(response, $"POST ODataV4/{serviceName}");
 
                 var responseJson = await response.Content.ReadAsStringAsync();
 
@@ -274,7 +274,7 @@ namespace MeFriendApi.Services.Services
 
             var response = await client.SendAsync(request);
 
-            response.EnsureSuccessStatusCode();
+            await EnsureBusinessCentralSuccessAsync(response, $"PATCH {apiPath}");
 
             // Some BC PATCH APIs return 204 NoContent
             if (response.Content == null)
@@ -317,7 +317,7 @@ namespace MeFriendApi.Services.Services
 
             var response = await client.DeleteAsync(url);
 
-            response.EnsureSuccessStatusCode();
+            await EnsureBusinessCentralSuccessAsync(response, $"DELETE {apiPath}");
         }
 
         public async Task<BcAttachmentResponseDto?> UploadAttachmentsToBcAsync(
@@ -401,6 +401,29 @@ namespace MeFriendApi.Services.Services
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             return client;
+        }
+
+        private static async Task EnsureBusinessCentralSuccessAsync(
+            HttpResponseMessage response,
+            string operation)
+        {
+            if (response.IsSuccessStatusCode)
+                return;
+
+            var responseContent = response.Content == null
+                ? string.Empty
+                : await response.Content.ReadAsStringAsync();
+
+            var message =
+                $"Business Central request failed for {operation}. " +
+                $"Status: {(int)response.StatusCode} {response.ReasonPhrase}.";
+
+            if (!string.IsNullOrWhiteSpace(responseContent))
+            {
+                message += $" Response: {responseContent}";
+            }
+
+            throw new InternalException(message);
         }
 
         private string BuildNamedODataServiceUrl(string serviceName, string? queryString = null)
