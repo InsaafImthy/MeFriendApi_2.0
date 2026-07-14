@@ -9,6 +9,8 @@ namespace MeFriendApi.Services.Interfaces
         Task<string> GetAccessToken();
         Task<List<T>> GetDataFromBc<T>(string apiPath, string? filter = "", BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2);
         Task<TResponse?> PostDataToBc<TRequest, TResponse>(string apiPath, TRequest payload, BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1);
+        Task<List<T>> GetFromODataServiceAsync<T>(string serviceName, string? queryString = null);
+        Task<TResponse?> PostToODataServiceAsync<TRequest, TResponse>(string serviceName, TRequest payload, string? queryString = null);
         Task<TResponse?> PatchDataToBc<TRequest, TResponse>( string apiPath, TRequest payload, string? etag = null, BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1);
         Task DeleteDataFromBc( string apiPath, string? etag = null, BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1);
         Task<BcAttachmentResponseDto?> UploadAttachmentsToBcAsync(
@@ -17,4 +19,3 @@ namespace MeFriendApi.Services.Interfaces
             BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1);
     }
 }
-

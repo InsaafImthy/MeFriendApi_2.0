@@ -66,7 +66,7 @@ namespace MeFriendApi.Services.Services
 
                 var response = await client.GetAsync(url);
 
-                response.EnsureSuccessStatusCode();
+                await EnsureBusinessCentralSuccessAsync(response, $"GET {apiPath}");
 
                 var json = await response.Content.ReadAsStringAsync();
 
@@ -96,9 +96,9 @@ namespace MeFriendApi.Services.Services
                     ? new List<T> { singleObject }
                     : new List<T>();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw new InternalException("Failed to get response");
+                throw new InternalException($"Failed to get response: {ex.Message}", ex);
             }
         }
         
@@ -131,7 +131,7 @@ namespace MeFriendApi.Services.Services
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await client.PostAsync(url, content);
-            response.EnsureSuccessStatusCode();
+            await EnsureBusinessCentralSuccessAsync(response, $"POST {apiPath}");
 
             var responseJson = await response.Content.ReadAsStringAsync();
 
@@ -140,6 +140,95 @@ namespace MeFriendApi.Services.Services
                 PropertyNameCaseInsensitive = true
             });
         }
+
+        public async Task<List<T>> GetFromODataServiceAsync<T>(
+            string serviceName,
+            string? queryString = null)
+        {
+            try
+            {
+                var token = await GetAccessToken();
+
+                var client = CreateBusinessCentralClient(token);
+
+                var url = BuildNamedODataServiceUrl(serviceName, queryString);
+
+                var response = await client.GetAsync(url);
+                await EnsureBusinessCentralSuccessAsync(response, $"GET ODataV4/{serviceName}");
+
+                var json = await response.Content.ReadAsStringAsync();
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                if (root.TryGetProperty("value", out _))
+                {
+                    var result = JsonSerializer.Deserialize<BcODataResponse<T>>(json, options);
+                    return result?.Value ?? new List<T>();
+                }
+
+                var singleObject = JsonSerializer.Deserialize<T>(json, options);
+
+                return singleObject != null
+                    ? new List<T> { singleObject }
+                    : new List<T>();
+            }
+            catch (Exception ex)
+            {
+                throw new InternalException(
+                    $"Failed to get response from Business Central OData service '{serviceName}': {ex.Message}",
+                    ex);
+            }
+        }
+
+        public async Task<TResponse?> PostToODataServiceAsync<TRequest, TResponse>(
+            string serviceName,
+            TRequest payload,
+            string? queryString = null)
+        {
+            try
+            {
+                var token = await GetAccessToken();
+
+                var client = CreateBusinessCentralClient(token);
+
+                var url = BuildNamedODataServiceUrl(serviceName, queryString);
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                var json = JsonSerializer.Serialize(payload, options);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync(url, content);
+                await EnsureBusinessCentralSuccessAsync(response, $"POST ODataV4/{serviceName}");
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(responseJson))
+                    return default;
+
+                return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (Exception ex)
+            {
+                throw new InternalException(
+                    $"Failed to post to Business Central OData service '{serviceName}': {ex.Message}",
+                    ex);
+            }
+        }
+
         public async Task<TResponse?> PatchDataToBc<TRequest, TResponse>(
             string apiPath,
             TRequest payload,
@@ -185,7 +274,7 @@ namespace MeFriendApi.Services.Services
 
             var response = await client.SendAsync(request);
 
-            response.EnsureSuccessStatusCode();
+            await EnsureBusinessCentralSuccessAsync(response, $"PATCH {apiPath}");
 
             // Some BC PATCH APIs return 204 NoContent
             if (response.Content == null)
@@ -228,7 +317,7 @@ namespace MeFriendApi.Services.Services
 
             var response = await client.DeleteAsync(url);
 
-            response.EnsureSuccessStatusCode();
+            await EnsureBusinessCentralSuccessAsync(response, $"DELETE {apiPath}");
         }
 
         public async Task<BcAttachmentResponseDto?> UploadAttachmentsToBcAsync(
@@ -312,6 +401,56 @@ namespace MeFriendApi.Services.Services
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             return client;
+        }
+
+        private static async Task EnsureBusinessCentralSuccessAsync(
+            HttpResponseMessage response,
+            string operation)
+        {
+            if (response.IsSuccessStatusCode)
+                return;
+
+            var responseContent = response.Content == null
+                ? string.Empty
+                : await response.Content.ReadAsStringAsync();
+
+            var message =
+                $"Business Central request failed for {operation}. " +
+                $"Status: {(int)response.StatusCode} {response.ReasonPhrase}.";
+
+            if (!string.IsNullOrWhiteSpace(responseContent))
+            {
+                message += $" Response: {responseContent}";
+            }
+
+            throw new InternalException(message);
+        }
+
+        private string BuildNamedODataServiceUrl(string serviceName, string? queryString = null)
+        {
+            var baseUrl = _configuration["AzureAd:BaseUrl"]?.TrimEnd('/');
+            var companyName = _configuration["CompanyInfo:CompanyName"];
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                throw new InternalException("AzureAd:BaseUrl configuration value is missing.");
+
+            if (string.IsNullOrWhiteSpace(companyName))
+                throw new InternalException("CompanyInfo:CompanyName configuration value is missing.");
+
+            var encodedCompanyName = Uri.EscapeDataString(companyName);
+            var url = $"{baseUrl}/ODataV4/{serviceName}?company={encodedCompanyName}";
+
+            if (!string.IsNullOrWhiteSpace(queryString))
+            {
+                var normalizedQuery = queryString.TrimStart('?', '&');
+
+                if (!string.IsNullOrWhiteSpace(normalizedQuery))
+                {
+                    url += $"&{normalizedQuery}";
+                }
+            }
+
+            return url;
         }
     }
 }
