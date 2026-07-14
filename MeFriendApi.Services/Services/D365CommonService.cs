@@ -428,6 +428,13 @@ namespace MeFriendApi.Services.Services
 
         private string BuildNamedODataServiceUrl(string serviceName, string? queryString = null)
         {
+            var configuredServiceUrl = _configuration[$"BusinessCentralODataServices:{serviceName}:Url"];
+
+            if (!string.IsNullOrWhiteSpace(configuredServiceUrl))
+            {
+                return AppendQueryString(configuredServiceUrl, queryString);
+            }
+
             var baseUrl = _configuration["AzureAd:BaseUrl"]?.TrimEnd('/');
             var companyName = _configuration["CompanyInfo:CompanyName"];
 
@@ -437,16 +444,22 @@ namespace MeFriendApi.Services.Services
             if (string.IsNullOrWhiteSpace(companyName))
                 throw new InternalException("CompanyInfo:CompanyName configuration value is missing.");
 
-            var encodedCompanyName = Uri.EscapeDataString(companyName);
+            var encodedCompanyName = Uri.EscapeDataString(Uri.UnescapeDataString(companyName));
             var url = $"{baseUrl}/ODataV4/{serviceName}?company={encodedCompanyName}";
 
+            return AppendQueryString(url, queryString);
+        }
+
+        private static string AppendQueryString(string url, string? queryString = null)
+        {
             if (!string.IsNullOrWhiteSpace(queryString))
             {
                 var normalizedQuery = queryString.TrimStart('?', '&');
 
                 if (!string.IsNullOrWhiteSpace(normalizedQuery))
                 {
-                    url += $"&{normalizedQuery}";
+                    var separator = url.Contains('?') ? "&" : "?";
+                    url += $"{separator}{normalizedQuery}";
                 }
             }
 
