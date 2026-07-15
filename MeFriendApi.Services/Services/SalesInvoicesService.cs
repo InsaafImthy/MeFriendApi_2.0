@@ -1,5 +1,6 @@
 using MeFriendApi.Domain.Dto.SalesInvoices;
 using MeFriendApi.Services.Interfaces;
+using static MeFriendApi.Domain.Constants;
 
 namespace MeFriendApi.Services.Services
 {
@@ -16,8 +17,10 @@ namespace MeFriendApi.Services.Services
         {
             try
             {
-                return await _d365CommonService.GetFromODataServiceAsync<SalesInvoiceDto>(
-                    "MefriendLLP_SalesInvoice");
+                return await _d365CommonService.GetDataFromBc<SalesInvoiceDto>(
+                    "/SalesInvoiceHeaders",
+                    "?$expand=SalesInvoiceLines",
+                    BcWebServiceProtocol.V1);
             }
             catch (Exception ex)
             {

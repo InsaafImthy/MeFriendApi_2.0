@@ -47,6 +47,9 @@ namespace MeFriendApi.Domain.Dto.SalesInvoices
         [JsonPropertyName("status")]
         public string? Status { get; set; }
 
+        [JsonPropertyName("SalesInvoiceLines")]
+        public List<SalesInvoiceLineDto> SalesInvoiceLines { get; set; } = new();
+
         [JsonExtensionData]
         public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
     }
