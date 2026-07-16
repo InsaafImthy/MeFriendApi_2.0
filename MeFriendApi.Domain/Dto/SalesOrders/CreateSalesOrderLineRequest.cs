@@ -13,7 +13,19 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("quantity")]
         public decimal Quantity { get; set; }
 
-        [JsonPropertyName("unitpriceexclTax")]
-        public decimal UnitPriceExclTax { get; set; }
+        [JsonPropertyName("rate")]
+        public decimal Rate { get; set; }
+
+        [JsonPropertyName("dimension")]
+        public List<CreateSalesOrderLineDimensionRequest> Dimension { get; set; } = new();
+    }
+
+    public class CreateSalesOrderLineDimensionRequest
+    {
+        [JsonPropertyName("dimensionCode")]
+        public string? DimensionCode { get; set; }
+
+        [JsonPropertyName("dimensionValueCode")]
+        public string? DimensionValueCode { get; set; }
     }
 }
