@@ -20,7 +20,14 @@ namespace MeFriendApi.Controllers
             try
             {
                 var dimensions = await _dimensionsService.GetDimensionsAsync();
-                return Ok(dimensions);
+                var productDimension = dimensions.FirstOrDefault();
+
+                if (productDimension == null)
+                {
+                    return NotFound("Product dimension was not found.");
+                }
+
+                return Ok(productDimension);
             }
             catch (Exception ex)
             {

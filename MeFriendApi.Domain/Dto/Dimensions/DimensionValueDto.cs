@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MeFriendApi.Domain.Dto.Dimensions
@@ -17,7 +16,5 @@ namespace MeFriendApi.Domain.Dto.Dimensions
         [JsonPropertyName("name")]
         public string? Name { get; set; }
 
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
     }
 }
