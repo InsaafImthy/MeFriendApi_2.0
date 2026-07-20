@@ -5,5 +5,6 @@ namespace MeFriendApi.Services.Interfaces
     public interface ISalespersonsService
     {
         Task<IEnumerable<SalespersonDto>> GetSalespersonsAsync();
+        Task<IEnumerable<SalespersonLookupDto>> GetSalespersonLookupsAsync();
     }
 }

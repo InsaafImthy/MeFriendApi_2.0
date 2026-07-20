@@ -27,5 +27,20 @@ namespace MeFriendApi.Services.Services
                 throw new Exception($"Error retrieving salespersons: {ex.Message}", ex);
             }
         }
+
+        public async Task<IEnumerable<SalespersonLookupDto>> GetSalespersonLookupsAsync()
+        {
+            try
+            {
+                return await _d365CommonService.GetDataFromBc<SalespersonLookupDto>(
+                    "/salespersons",
+                    "?$select=code,name",
+                    BcWebServiceProtocol.V1);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error retrieving salesperson lookups: {ex.Message}", ex);
+            }
+        }
     }
 }

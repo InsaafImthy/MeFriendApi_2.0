@@ -26,6 +26,21 @@ namespace MeFriendApi.Services.Services
             }
         }
 
+        public async Task<IEnumerable<CustomerLookupDto>> GetCustomerLookupsAsync()
+        {
+            try
+            {
+                return await _d365CommonService.GetDataFromBc<CustomerLookupDto>(
+                    "/customers",
+                    "?$select=no,name",
+                    BcWebServiceProtocol.V1);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error retrieving customer lookups: {ex.Message}", ex);
+            }
+        }
+
         public async Task<Customers?> CreateCustomerAsync(CreateCustomerRequest request)
         {
             try

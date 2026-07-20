@@ -29,6 +29,20 @@ namespace MeFriendApi.Controllers
             }
         }
 
+        [HttpGet("lookup")]
+        public async Task<IActionResult> GetCustomerLookups()
+        {
+            try
+            {
+                var customers = await _customersService.GetCustomerLookupsAsync();
+                return Ok(customers);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateCustomer(CreateCustomerRequest request)
         {

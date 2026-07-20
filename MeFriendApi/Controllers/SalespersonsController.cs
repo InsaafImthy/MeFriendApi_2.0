@@ -27,5 +27,19 @@ namespace MeFriendApi.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        [HttpGet("lookup")]
+        public async Task<IActionResult> GetSalespersonLookups()
+        {
+            try
+            {
+                var salespersons = await _salespersonsService.GetSalespersonLookupsAsync();
+                return Ok(salespersons);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
     }
 }
