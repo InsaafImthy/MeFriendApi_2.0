@@ -13,6 +13,7 @@ namespace MeFriendApi.Services
             services.AddTransient<UserAuthMiddleware>();
             services.AddScoped<ID365CommonService, D365CommonService>();
             services.AddScoped<ICustomersService, CustomersService>();
+            services.AddScoped<IItemMastersService, ItemMastersService>();
             services.AddScoped<ISalespersonsService, SalespersonsService>();
             services.AddScoped<IDimensionsService, DimensionsService>();
             services.AddScoped<ISalesOrdersService, SalesOrdersService>();

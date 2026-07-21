@@ -6,7 +6,8 @@
         {
             V2,
             ODataV4,
-            V1
+            V1,
+            ItemMasterV1
         }
     }
 }
