@@ -13,6 +13,9 @@ namespace MeFriendApi.Domain.Dto
         [JsonPropertyName("address")]
         public string? Address { get; set; }
 
+        [JsonPropertyName("address2")]
+        public string? Address2 { get; set; }
+
         [JsonPropertyName("stateCode")]
         public string? StateCode { get; set; }
 
@@ -27,6 +30,9 @@ namespace MeFriendApi.Domain.Dto
 
         [JsonPropertyName("locationCode")]
         public string? LocationCode { get; set; }
+
+        [JsonPropertyName("phoneNumber")]
+        public string? PhoneNumber { get; set; }
 
         [JsonPropertyName("PAN")]
         public string? PAN { get; set; }

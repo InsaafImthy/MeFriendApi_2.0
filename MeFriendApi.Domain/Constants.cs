@@ -7,7 +7,8 @@
             V2,
             ODataV4,
             V1,
-            ItemMasterV1
+            ItemMasterV1,
+            CustomerMasterV1
         }
     }
 }

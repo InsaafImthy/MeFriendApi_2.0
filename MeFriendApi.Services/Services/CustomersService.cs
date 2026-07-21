@@ -16,8 +16,10 @@ namespace MeFriendApi.Services.Services
         {
             try
             {
-                var customers = await _d365CommonService.GetDataFromBc<Customers>("/customers", "",
-                BcWebServiceProtocol.V1);
+                var customers = await _d365CommonService.GetDataFromBc<Customers>(
+                    "/customerMasters",
+                    "",
+                    BcWebServiceProtocol.CustomerMasterV1);
                 return customers;
             }
             catch (Exception ex)
@@ -31,9 +33,9 @@ namespace MeFriendApi.Services.Services
             try
             {
                 return await _d365CommonService.GetDataFromBc<CustomerLookupDto>(
-                    "/customers",
-                    "?$select=no,name",
-                    BcWebServiceProtocol.V1);
+                    "/customerMasters",
+                    "?$select=number,name",
+                    BcWebServiceProtocol.CustomerMasterV1);
             }
             catch (Exception ex)
             {
@@ -46,9 +48,9 @@ namespace MeFriendApi.Services.Services
             try
             {
                 return await _d365CommonService.PostDataToBc<CreateCustomerRequest, Customers>(
-                    "/customers",
+                    "/customerMasters",
                     request,
-                    BcWebServiceProtocol.V1);
+                    BcWebServiceProtocol.CustomerMasterV1);
             }
             catch (Exception ex)
             {

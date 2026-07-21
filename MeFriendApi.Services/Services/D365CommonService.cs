@@ -55,6 +55,7 @@ namespace MeFriendApi.Services.Services
                     BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
                     BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
                     BcWebServiceProtocol.ItemMasterV1 => $"api/mefriend/itemmaster/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
+                    BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
                     _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
                 };
 
@@ -118,6 +119,7 @@ namespace MeFriendApi.Services.Services
                 BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
                 BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
                 BcWebServiceProtocol.ItemMasterV1 => $"api/mefriend/itemmaster/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
+                BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
                 _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
             };
 
@@ -247,6 +249,7 @@ namespace MeFriendApi.Services.Services
                 BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
                 BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
                 BcWebServiceProtocol.ItemMasterV1 => $"api/mefriend/itemmaster/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
+                BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
                 _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
             };
 
@@ -310,6 +313,7 @@ namespace MeFriendApi.Services.Services
                 BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
                 BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
                 BcWebServiceProtocol.ItemMasterV1 => $"api/mefriend/itemmaster/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
+                BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
                 _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
             };
 
@@ -351,6 +355,9 @@ namespace MeFriendApi.Services.Services
 
                     BcWebServiceProtocol.ItemMasterV1 =>
                         $"api/mefriend/itemmaster/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
+
+                    BcWebServiceProtocol.CustomerMasterV1 =>
+                        $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
 
                     _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
                 };

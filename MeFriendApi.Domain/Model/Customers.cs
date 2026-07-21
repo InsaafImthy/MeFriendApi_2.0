@@ -7,8 +7,11 @@ namespace MeFriendApi.Domain.Dto
         [JsonPropertyName("@odata.etag")]
         public string ODataEtag { get; set; } = null!;
 
-        [JsonPropertyName("no")]
-        public string No { get; set; } = null!;
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = null!;
+
+        [JsonPropertyName("number")]
+        public string Number { get; set; } = null!;
 
         [JsonPropertyName("name")]
         public string Name { get; set; } = null!;
@@ -18,6 +21,9 @@ namespace MeFriendApi.Domain.Dto
 
         [JsonPropertyName("address")]
         public string Address { get; set; } = null!;
+
+        [JsonPropertyName("address2")]
+        public string Address2 { get; set; } = null!;
 
         [JsonPropertyName("stateCode")]
         public string StateCode { get; set; } = null!;
@@ -34,6 +40,9 @@ namespace MeFriendApi.Domain.Dto
         [JsonPropertyName("locationCode")]
         public string LocationCode { get; set; } = null!;
 
+        [JsonPropertyName("phoneNumber")]
+        public string PhoneNumber { get; set; } = null!;
+
         [JsonPropertyName("PAN")]
         public string PAN { get; set; } = null!;
 
@@ -48,5 +57,11 @@ namespace MeFriendApi.Domain.Dto
 
         [JsonPropertyName("gstCustomerType")]
         public string GstCustomerType { get; set; } = null!;
+
+        [JsonPropertyName("createdDateTime")]
+        public DateTimeOffset? CreatedDateTime { get; set; }
+
+        [JsonPropertyName("modifiedDateTime")]
+        public DateTimeOffset? ModifiedDateTime { get; set; }
     }
 }

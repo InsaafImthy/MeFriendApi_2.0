@@ -4,7 +4,7 @@ namespace MeFriendApi.Domain.Dto
 {
     public class CustomerLookupDto
     {
-        [JsonPropertyName("no")]
+        [JsonPropertyName("number")]
         public string? Code { get; set; }
 
         [JsonPropertyName("name")]
