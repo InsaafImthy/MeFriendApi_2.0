@@ -16,6 +16,9 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("rate")]
         public decimal Rate { get; set; }
 
+        [JsonPropertyName("lineDiscountPercentage")]
+        public decimal? LineDiscountPercentage { get; set; }
+
         [JsonPropertyName("dimension")]
         public List<CreateSalesOrderLineDimensionRequest> Dimension { get; set; } = new();
     }

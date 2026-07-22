@@ -25,6 +25,12 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("locationcode")]
         public string? LocationCode { get; set; }
 
+        [JsonPropertyName("invoiceDiscountAmountExclVat")]
+        public decimal? InvoiceDiscountAmountExclVat { get; set; }
+
+        [JsonPropertyName("invoiceDiscountPercent")]
+        public decimal? InvoiceDiscountPercent { get; set; }
+
         [JsonPropertyName("salesLines")]
         public List<CreateSalesOrderLineRequest> SalesLines { get; set; } = new();
     }
