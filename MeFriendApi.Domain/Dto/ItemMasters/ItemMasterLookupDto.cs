@@ -9,5 +9,8 @@ namespace MeFriendApi.Domain.Dto
 
         [JsonPropertyName("description")]
         public string? Description { get; set; }
+
+        [JsonPropertyName("unitPrice")]
+        public decimal? UnitPrice { get; set; }
     }
 }

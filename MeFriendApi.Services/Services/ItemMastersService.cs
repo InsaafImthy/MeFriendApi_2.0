@@ -34,7 +34,7 @@ namespace MeFriendApi.Services.Services
             {
                 return await _d365CommonService.GetDataFromBc<ItemMasterLookupDto>(
                     "/itemMasters",
-                    "?$select=number,description",
+                    "?$select=number,description,unitPrice",
                     BcWebServiceProtocol.ItemMasterV1);
             }
             catch (Exception ex)
