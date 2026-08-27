@@ -18,9 +18,9 @@ namespace MeFriendApi.Services.Services
             try
             {
                 return await _d365CommonService.GetDataFromBc<SalesOrderDto>(
-                    "/SalesOrderHeaders",
-                    "?$expand=SalesOrderLines",
-                    BcWebServiceProtocol.V1);
+                    "/salesOrders",
+                    "",
+                    BcWebServiceProtocol.CustomerMasterV1);
             }
             catch (Exception ex)
             {
