@@ -20,7 +20,8 @@ namespace MeFriendApi.Services.Services
                 return await _d365CommonService.GetDataFromBc<SalesInvoiceDto>(
                     "/SalesInvoiceHeaders",
                     "?$expand=SalesInvoiceLines",
-                    BcWebServiceProtocol.V1);
+                    BcWebServiceProtocol.V1,
+                    "SalesInvoices");
             }
             catch (Exception ex)
             {

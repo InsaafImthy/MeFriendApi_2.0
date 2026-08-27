@@ -41,7 +41,8 @@ namespace MeFriendApi.Services.Services
         public async Task<List<T>> GetDataFromBc<T>(
             string apiPath,
             string? filter = "",
-            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2)
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2,
+            string? apiServiceName = null)
         {
             try
             {
@@ -59,12 +60,19 @@ namespace MeFriendApi.Services.Services
                     _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
                 };
 
-                var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
-
-                if (!string.IsNullOrWhiteSpace(filter))
+                string url;
+                if (!string.IsNullOrWhiteSpace(apiServiceName))
                 {
-                    url += filter;
+                    url = _configuration[$"BusinessCentralApiServices:{apiServiceName}:Url"]
+                        ?? throw new InternalException(
+                            $"Business Central API URL configuration is missing for '{apiServiceName}'.");
                 }
+                else
+                {
+                    url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+                }
+
+                url = AppendQueryString(url, filter);
 
                 var response = await client.GetAsync(url);
 

@@ -20,7 +20,8 @@ namespace MeFriendApi.Services.Services
                 return await _d365CommonService.GetDataFromBc<DimensionDto>(
                     "/dimensions",
                     "?$filter=code%20eq%20%27PRODUCT%27&$expand=dimensionvalues",
-                    BcWebServiceProtocol.V1);
+                    BcWebServiceProtocol.V1,
+                    "Dimensions");
             }
             catch (Exception ex)
             {

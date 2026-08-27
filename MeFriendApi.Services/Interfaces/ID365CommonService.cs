@@ -7,7 +7,11 @@ namespace MeFriendApi.Services.Interfaces
     public interface ID365CommonService
     {
         Task<string> GetAccessToken();
-        Task<List<T>> GetDataFromBc<T>(string apiPath, string? filter = "", BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2);
+        Task<List<T>> GetDataFromBc<T>(
+            string apiPath,
+            string? filter = "",
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2,
+            string? apiServiceName = null);
         Task<TResponse?> PostDataToBc<TRequest, TResponse>(string apiPath, TRequest payload, BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1);
         Task<List<T>> GetFromODataServiceAsync<T>(string serviceName, string? queryString = null);
         Task<TResponse?> PostToODataServiceAsync<TRequest, TResponse>(string serviceName, TRequest payload, string? queryString = null);

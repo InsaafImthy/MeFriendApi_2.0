@@ -20,7 +20,8 @@ namespace MeFriendApi.Services.Services
                 return await _d365CommonService.GetDataFromBc<SalespersonDto>(
                     "/salespersons",
                     "",
-                    BcWebServiceProtocol.V1);
+                    BcWebServiceProtocol.V1,
+                    "Salespersons");
             }
             catch (Exception ex)
             {
@@ -35,7 +36,8 @@ namespace MeFriendApi.Services.Services
                 return await _d365CommonService.GetDataFromBc<SalespersonLookupDto>(
                     "/salespersons",
                     "?$select=code,name",
-                    BcWebServiceProtocol.V1);
+                    BcWebServiceProtocol.V1,
+                    "Salespersons");
             }
             catch (Exception ex)
             {
