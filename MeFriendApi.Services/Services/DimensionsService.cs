@@ -1,4 +1,5 @@
 using MeFriendApi.Domain.Dto.Dimensions;
+using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Interfaces;
 using static MeFriendApi.Domain.Constants;
 
@@ -15,18 +16,13 @@ namespace MeFriendApi.Services.Services
 
         public async Task<IEnumerable<DimensionDto>> GetDimensionsAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<DimensionDto>(
-                    "/dimensions",
-                    "?$filter=code%20eq%20%27PRODUCT%27&$expand=dimensionvalues",
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<DimensionDto>(
+                    BusinessCentralDefaults.ApiPaths.Dimensions,
+                    BusinessCentralDefaults.Queries.DimensionsWithValues,
                     BcWebServiceProtocol.V1,
-                    "Dimensions");
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving dimensions: {ex.Message}", ex);
-            }
+                    BusinessCentralDefaults.ApiServiceNames.Dimensions),
+                "Error retrieving dimensions");
         }
     }
 }

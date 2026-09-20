@@ -1,4 +1,5 @@
 using MeFriendApi.Domain.Dto;
+using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Interfaces;
 using static MeFriendApi.Domain.Constants;
 
@@ -15,32 +16,22 @@ namespace MeFriendApi.Services.Services
 
         public async Task<IEnumerable<ItemMaster>> GetItemMastersAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<ItemMaster>(
-                    "/itemMasters",
-                    "",
-                    BcWebServiceProtocol.ItemMasterV1);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving item masters: {ex.Message}", ex);
-            }
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<ItemMaster>(
+                    BusinessCentralDefaults.ApiPaths.ItemMasters,
+                    BusinessCentralDefaults.Queries.None,
+                    BcWebServiceProtocol.ItemMasterV1),
+                "Error retrieving item masters");
         }
 
         public async Task<IEnumerable<ItemMasterLookupDto>> GetItemMasterLookupsAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<ItemMasterLookupDto>(
-                    "/itemMasters",
-                    "?$select=number,description,unitPrice",
-                    BcWebServiceProtocol.ItemMasterV1);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving item master lookups: {ex.Message}", ex);
-            }
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<ItemMasterLookupDto>(
+                    BusinessCentralDefaults.ApiPaths.ItemMasters,
+                    BusinessCentralDefaults.Queries.ItemMasterLookup,
+                    BcWebServiceProtocol.ItemMasterV1),
+                "Error retrieving item master lookups");
         }
     }
 }

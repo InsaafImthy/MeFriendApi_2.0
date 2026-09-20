@@ -1,3 +1,4 @@
+using MeFriendApi.Domain;
 using MeFriendApi.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -5,34 +6,31 @@ namespace MeFriendApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class DimensionsController : ControllerBase
+    public class DimensionsController : ApiControllerBase
     {
         private readonly IDimensionsService _dimensionsService;
 
-        public DimensionsController(IDimensionsService dimensionsService)
+        public DimensionsController(
+            IDimensionsService dimensionsService,
+            ILogger<ApiControllerBase> logger)
+            : base(logger)
         {
             _dimensionsService = dimensionsService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetDimensions()
-        {
-            try
+        public Task<IActionResult> GetDimensions() =>
+            ExecuteAsync(async () =>
             {
                 var dimensions = await _dimensionsService.GetDimensionsAsync();
                 var productDimension = dimensions.FirstOrDefault();
 
                 if (productDimension == null)
                 {
-                    return NotFound("Product dimension was not found.");
+                    return NotFound(Messages.ProductDimensionNotFound);
                 }
 
                 return Ok(productDimension);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+            });
     }
 }

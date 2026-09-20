@@ -1,4 +1,5 @@
 using MeFriendApi.Domain.Dto.SalesInvoices;
+using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Interfaces;
 using static MeFriendApi.Domain.Constants;
 
@@ -15,18 +16,13 @@ namespace MeFriendApi.Services.Services
 
         public async Task<IEnumerable<SalesInvoiceDto>> GetSalesInvoicesAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<SalesInvoiceDto>(
-                    "/SalesInvoiceHeaders",
-                    "?$expand=SalesInvoiceLines",
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<SalesInvoiceDto>(
+                    BusinessCentralDefaults.ApiPaths.SalesInvoices,
+                    BusinessCentralDefaults.Queries.SalesInvoicesWithLines,
                     BcWebServiceProtocol.V1,
-                    "SalesInvoices");
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving sales invoices: {ex.Message}", ex);
-            }
+                    BusinessCentralDefaults.ApiServiceNames.SalesInvoices),
+                "Error retrieving sales invoices");
         }
     }
 }

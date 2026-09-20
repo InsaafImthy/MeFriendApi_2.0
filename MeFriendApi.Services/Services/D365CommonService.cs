@@ -2,6 +2,7 @@
 using MeFriendApi.Domain.Dto.Helpers;
 using MeFriendApi.Domain.DTO;
 using MeFriendApi.Domain.Exceptions;
+using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -16,24 +17,38 @@ namespace MeFriendApi.Services.Services
 {
     public class D365CommonService : ID365CommonService
     {
+        private static readonly IReadOnlyCollection<string> AccessTokenScopes =
+            Array.AsReadOnly([BusinessCentralDefaults.AccessTokenScope]);
+
+        private static readonly JsonSerializerOptions DeserializationOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        private static readonly JsonSerializerOptions SerializationOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly Lazy<IConfidentialClientApplication> _confidentialClientApplication;
 
         public D365CommonService(IConfiguration configuration, IHttpClientFactory httpClientFactory)
         {
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
+            _confidentialClientApplication = new Lazy<IConfidentialClientApplication>(
+                CreateConfidentialClientApplication,
+                LazyThreadSafetyMode.ExecutionAndPublication);
         }
+
         public async Task<string> GetAccessToken()
         {
-            var app = ConfidentialClientApplicationBuilder.Create(_configuration["AzureAd:ClientId"])
-                .WithClientSecret(_configuration["AzureAd:ClientSecret"])
-                .WithAuthority($"https://login.microsoftonline.com/{_configuration["AzureAd:TenantId"]}")
-                .Build();
-
-            var scopes = new[] { "https://api.businesscentral.dynamics.com/.default" };
-
-            var result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
+            var result = await _confidentialClientApplication.Value
+                .AcquireTokenForClient(AccessTokenScopes)
+                .ExecuteAsync();
 
             return result.AccessToken;
         }
@@ -50,57 +65,43 @@ namespace MeFriendApi.Services.Services
 
                 var client = CreateBusinessCentralClient(token);
 
-                var protocolPath = bcWebServiceProtocol switch
-                {
-                    BcWebServiceProtocol.V2 => "api/v2.0",
-                    BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
-                    BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
-                    BcWebServiceProtocol.ItemMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                    BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                    _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
-                };
-
                 string url;
                 if (!string.IsNullOrWhiteSpace(apiServiceName))
                 {
-                    url = _configuration[$"BusinessCentralApiServices:{apiServiceName}:Url"]
+                    url = _configuration[
+                            BusinessCentralDefaults.ConfigurationKeys.ApiServiceUrl(apiServiceName)]
                         ?? throw new InternalException(
                             $"Business Central API URL configuration is missing for '{apiServiceName}'.");
                 }
                 else
                 {
-                    url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+                    url = BuildApiUrl(apiPath, bcWebServiceProtocol);
                 }
 
                 url = AppendQueryString(url, filter);
 
-                var response = await client.GetAsync(url);
+                using var response = await client.GetAsync(url);
 
                 await EnsureBusinessCentralSuccessAsync(response, $"GET {apiPath}");
 
                 var json = await response.Content.ReadAsStringAsync();
-
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                };
 
                 using var document = JsonDocument.Parse(json);
 
                 var root = document.RootElement;
 
                 // Collection response
-                if (root.TryGetProperty("value", out var valueElement))
+                if (root.TryGetProperty(BusinessCentralDefaults.ODataCollectionPropertyName, out _))
                 {
-                    var result =
-                        JsonSerializer.Deserialize<BcODataResponse<T>>(json, options);
+                    var result = JsonSerializer.Deserialize<BcODataResponse<T>>(
+                        json,
+                        DeserializationOptions);
 
                     return result?.Value ?? new List<T>();
                 }
 
                 // Single object response
-                var singleObject =
-                    JsonSerializer.Deserialize<T>(json, options);
+                var singleObject = JsonSerializer.Deserialize<T>(json, DeserializationOptions);
 
                 return singleObject != null
                     ? new List<T> { singleObject }
@@ -121,36 +122,20 @@ namespace MeFriendApi.Services.Services
 
             var client = CreateBusinessCentralClient(token);
 
-            var protocolPath = bcWebServiceProtocol switch
-            {
-                BcWebServiceProtocol.V2 => "api/v2.0",
-                BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
-                BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
-                BcWebServiceProtocol.ItemMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
-            };
+            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
 
-            var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+            var json = JsonSerializer.Serialize(payload, SerializationOptions);
+            using var content = new StringContent(
+                json,
+                Encoding.UTF8,
+                BusinessCentralDefaults.JsonMediaType);
 
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
-
-            var json = JsonSerializer.Serialize(payload, options);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await client.PostAsync(url, content);
+            using var response = await client.PostAsync(url, content);
             await EnsureBusinessCentralSuccessAsync(response, $"POST {apiPath}");
 
             var responseJson = await response.Content.ReadAsStringAsync();
 
-            return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            return JsonSerializer.Deserialize<TResponse>(responseJson, DeserializationOptions);
         }
 
         public async Task<List<T>> GetFromODataServiceAsync<T>(
@@ -165,26 +150,23 @@ namespace MeFriendApi.Services.Services
 
                 var url = BuildNamedODataServiceUrl(serviceName, queryString);
 
-                var response = await client.GetAsync(url);
+                using var response = await client.GetAsync(url);
                 await EnsureBusinessCentralSuccessAsync(response, $"GET ODataV4/{serviceName}");
 
                 var json = await response.Content.ReadAsStringAsync();
 
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                };
-
                 using var document = JsonDocument.Parse(json);
                 var root = document.RootElement;
 
-                if (root.TryGetProperty("value", out _))
+                if (root.TryGetProperty(BusinessCentralDefaults.ODataCollectionPropertyName, out _))
                 {
-                    var result = JsonSerializer.Deserialize<BcODataResponse<T>>(json, options);
+                    var result = JsonSerializer.Deserialize<BcODataResponse<T>>(
+                        json,
+                        DeserializationOptions);
                     return result?.Value ?? new List<T>();
                 }
 
-                var singleObject = JsonSerializer.Deserialize<T>(json, options);
+                var singleObject = JsonSerializer.Deserialize<T>(json, DeserializationOptions);
 
                 return singleObject != null
                     ? new List<T> { singleObject }
@@ -211,16 +193,13 @@ namespace MeFriendApi.Services.Services
 
                 var url = BuildNamedODataServiceUrl(serviceName, queryString);
 
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                };
+                var json = JsonSerializer.Serialize(payload, SerializationOptions);
+                using var content = new StringContent(
+                    json,
+                    Encoding.UTF8,
+                    BusinessCentralDefaults.JsonMediaType);
 
-                var json = JsonSerializer.Serialize(payload, options);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await client.PostAsync(url, content);
+                using var response = await client.PostAsync(url, content);
                 await EnsureBusinessCentralSuccessAsync(response, $"POST ODataV4/{serviceName}");
 
                 var responseJson = await response.Content.ReadAsStringAsync();
@@ -228,10 +207,7 @@ namespace MeFriendApi.Services.Services
                 if (string.IsNullOrWhiteSpace(responseJson))
                     return default;
 
-                return JsonSerializer.Deserialize<TResponse>(responseJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                return JsonSerializer.Deserialize<TResponse>(responseJson, DeserializationOptions);
             }
             catch (Exception ex)
             {
@@ -251,42 +227,26 @@ namespace MeFriendApi.Services.Services
 
             var client = CreateBusinessCentralClient(token);
 
-            var protocolPath = bcWebServiceProtocol switch
-            {
-                BcWebServiceProtocol.V2 => "api/v2.0",
-                BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
-                BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
-                BcWebServiceProtocol.ItemMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
-            };
-
             client.DefaultRequestHeaders.TryAddWithoutValidation(
-                                "If-Match",
-                                "*");
-            var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+                BusinessCentralDefaults.IfMatchHeaderName,
+                BusinessCentralDefaults.MatchAnyEtag);
+            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
 
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            };
+            var json = JsonSerializer.Serialize(payload, SerializationOptions);
 
-            var json = JsonSerializer.Serialize(payload, options);
-
-            var content = new StringContent(
+            using var content = new StringContent(
                 json,
                 Encoding.UTF8,
-                "application/json");
+                BusinessCentralDefaults.JsonMediaType);
 
-            var request = new HttpRequestMessage(
+            using var request = new HttpRequestMessage(
                 HttpMethod.Patch,
                 url)
             {
                 Content = content
             };
 
-            var response = await client.SendAsync(request);
+            using var response = await client.SendAsync(request);
 
             await EnsureBusinessCentralSuccessAsync(response, $"PATCH {apiPath}");
 
@@ -299,12 +259,7 @@ namespace MeFriendApi.Services.Services
             if (string.IsNullOrWhiteSpace(responseJson))
                 return default;
 
-            return JsonSerializer.Deserialize<TResponse>(
-                responseJson,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+            return JsonSerializer.Deserialize<TResponse>(responseJson, DeserializationOptions);
         }
         public async Task DeleteDataFromBc(
             string apiPath,
@@ -315,23 +270,13 @@ namespace MeFriendApi.Services.Services
 
             var client = CreateBusinessCentralClient(token);
 
-            var protocolPath = bcWebServiceProtocol switch
-            {
-                BcWebServiceProtocol.V2 => "api/v2.0",
-                BcWebServiceProtocol.ODataV4 => $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
-                BcWebServiceProtocol.V1 => $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
-                BcWebServiceProtocol.ItemMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                BcWebServiceProtocol.CustomerMasterV1 => $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
-            };
-
             client.DefaultRequestHeaders.TryAddWithoutValidation(
-                                "If-Match",
-                                "*");
+                BusinessCentralDefaults.IfMatchHeaderName,
+                BusinessCentralDefaults.MatchAnyEtag);
 
-            var url = $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{apiPath}";
+            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
 
-            var response = await client.DeleteAsync(url);
+            using var response = await client.DeleteAsync(url);
 
             await EnsureBusinessCentralSuccessAsync(response, $"DELETE {apiPath}");
         }
@@ -350,28 +295,9 @@ namespace MeFriendApi.Services.Services
 
                 var client = CreateBusinessCentralClient(token);
 
-                var protocolPath = bcWebServiceProtocol switch
-                {
-                    BcWebServiceProtocol.V2 =>
-                        "api/v2.0",
-
-                    BcWebServiceProtocol.ODataV4 =>
-                        $"ODataV4/Company('{_configuration["CompanyInfo:CompanyName"]}')",
-
-                    BcWebServiceProtocol.V1 =>
-                        $"api/CVT/CVTGroup/v1.0/Companies({_configuration["CompanyInfo:CompanyId"]})",
-
-                    BcWebServiceProtocol.ItemMasterV1 =>
-                        $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-
-                    BcWebServiceProtocol.CustomerMasterV1 =>
-                        $"api/aufait/MefriendAPI/v1.0/companies({_configuration["CompanyInfo:CompanyId"]})",
-
-                    _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
-                };
-
-                var url =
-                    $"{_configuration["AzureAd:BaseUrl"]}/{protocolPath}{filePathWithItemId}/Attachments";
+                var url = BuildApiUrl(
+                    $"{filePathWithItemId}{BusinessCentralDefaults.ApiPaths.Attachments}",
+                    bcWebServiceProtocol);
 
                 await using var stream = file.OpenReadStream();
 
@@ -382,15 +308,15 @@ namespace MeFriendApi.Services.Services
                 fileContent.Headers.ContentType =
                     new MediaTypeHeaderValue(
                         string.IsNullOrWhiteSpace(file.ContentType)
-                            ? "application/octet-stream"
+                            ? BusinessCentralDefaults.BinaryMediaType
                             : file.ContentType);
 
                 content.Add(
                     fileContent,
-                    "file",
+                    BusinessCentralDefaults.FileFormFieldName,
                     file.FileName);
 
-                var response = await client.PostAsync(url, content);
+                using var response = await client.PostAsync(url, content);
 
                 var responseContent = await response.Content.ReadAsStringAsync();
 
@@ -405,25 +331,32 @@ namespace MeFriendApi.Services.Services
 
                 return JsonSerializer.Deserialize<BcAttachmentResponseDto>(
                     responseContent,
-                    new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
+                    DeserializationOptions);
             }
             catch (Exception ex)
             {
                 throw new InternalException(
-                    $"Failed to upload attachment to Business Central: {ex.Message}");
+                    $"Failed to upload attachment to Business Central: {ex.Message}",
+                    ex);
             }
         }
 
         private HttpClient CreateBusinessCentralClient(string token)
         {
-            var client = _httpClientFactory.CreateClient(nameof(D365CommonService));
+            var client = _httpClientFactory.CreateClient(BusinessCentralDefaults.HttpClientName);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             return client;
         }
+
+        private IConfidentialClientApplication CreateConfidentialClientApplication() =>
+            ConfidentialClientApplicationBuilder.Create(
+                    _configuration[BusinessCentralDefaults.ConfigurationKeys.ClientId])
+                .WithClientSecret(
+                    _configuration[BusinessCentralDefaults.ConfigurationKeys.ClientSecret])
+                .WithAuthority(
+                    $"{BusinessCentralDefaults.AuthorityBaseUrl}/{_configuration[BusinessCentralDefaults.ConfigurationKeys.TenantId]}")
+                .Build();
 
         private static async Task EnsureBusinessCentralSuccessAsync(
             HttpResponseMessage response,
@@ -448,23 +381,56 @@ namespace MeFriendApi.Services.Services
             throw new InternalException(message);
         }
 
+        private string BuildApiUrl(
+            string apiPath,
+            BcWebServiceProtocol? bcWebServiceProtocol)
+        {
+            var baseUrl = _configuration[BusinessCentralDefaults.ConfigurationKeys.BaseUrl];
+            var protocolPath = GetProtocolPath(bcWebServiceProtocol);
+
+            return $"{baseUrl}/{protocolPath}{apiPath}";
+        }
+
+        private string GetProtocolPath(BcWebServiceProtocol? bcWebServiceProtocol)
+        {
+            var companyId = _configuration[BusinessCentralDefaults.ConfigurationKeys.CompanyId];
+
+            return bcWebServiceProtocol switch
+            {
+                BcWebServiceProtocol.V2 => BusinessCentralDefaults.ProtocolPaths.V2,
+                BcWebServiceProtocol.ODataV4 => string.Format(
+                    BusinessCentralDefaults.ProtocolPaths.ODataV4,
+                    _configuration[BusinessCentralDefaults.ConfigurationKeys.CompanyName]),
+                BcWebServiceProtocol.V1 => string.Format(
+                    BusinessCentralDefaults.ProtocolPaths.V1,
+                    companyId),
+                BcWebServiceProtocol.ItemMasterV1 or BcWebServiceProtocol.CustomerMasterV1 =>
+                    string.Format(BusinessCentralDefaults.ProtocolPaths.MefriendV1, companyId),
+                _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
+            };
+        }
+
         private string BuildNamedODataServiceUrl(string serviceName, string? queryString = null)
         {
-            var configuredServiceUrl = _configuration[$"BusinessCentralODataServices:{serviceName}:Url"];
+            var configuredServiceUrl = _configuration[
+                BusinessCentralDefaults.ConfigurationKeys.ODataServiceUrl(serviceName)];
 
             if (!string.IsNullOrWhiteSpace(configuredServiceUrl))
             {
                 return AppendQueryString(configuredServiceUrl, queryString);
             }
 
-            var baseUrl = _configuration["AzureAd:BaseUrl"]?.TrimEnd('/');
-            var companyName = _configuration["CompanyInfo:CompanyName"];
+            var baseUrl = _configuration[BusinessCentralDefaults.ConfigurationKeys.BaseUrl]?.TrimEnd('/');
+            var companyName =
+                _configuration[BusinessCentralDefaults.ConfigurationKeys.CompanyName];
 
             if (string.IsNullOrWhiteSpace(baseUrl))
-                throw new InternalException("AzureAd:BaseUrl configuration value is missing.");
+                throw new InternalException(
+                    $"{BusinessCentralDefaults.ConfigurationKeys.BaseUrl} configuration value is missing.");
 
             if (string.IsNullOrWhiteSpace(companyName))
-                throw new InternalException("CompanyInfo:CompanyName configuration value is missing.");
+                throw new InternalException(
+                    $"{BusinessCentralDefaults.ConfigurationKeys.CompanyName} configuration value is missing.");
 
             var encodedCompanyName = Uri.EscapeDataString(Uri.UnescapeDataString(companyName));
             var url = $"{baseUrl}/ODataV4/{serviceName}?company={encodedCompanyName}";

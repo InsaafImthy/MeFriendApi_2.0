@@ -1,4 +1,5 @@
 using MeFriendApi.Domain.Dto.Salespersons;
+using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Interfaces;
 using static MeFriendApi.Domain.Constants;
 
@@ -15,34 +16,24 @@ namespace MeFriendApi.Services.Services
 
         public async Task<IEnumerable<SalespersonDto>> GetSalespersonsAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<SalespersonDto>(
-                    "/salespersons",
-                    "",
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<SalespersonDto>(
+                    BusinessCentralDefaults.ApiPaths.Salespersons,
+                    BusinessCentralDefaults.Queries.None,
                     BcWebServiceProtocol.V1,
-                    "Salespersons");
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving salespersons: {ex.Message}", ex);
-            }
+                    BusinessCentralDefaults.ApiServiceNames.Salespersons),
+                "Error retrieving salespersons");
         }
 
         public async Task<IEnumerable<SalespersonLookupDto>> GetSalespersonLookupsAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<SalespersonLookupDto>(
-                    "/salespersons",
-                    "?$select=code,name",
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<SalespersonLookupDto>(
+                    BusinessCentralDefaults.ApiPaths.Salespersons,
+                    BusinessCentralDefaults.Queries.SalespersonLookup,
                     BcWebServiceProtocol.V1,
-                    "Salespersons");
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving salesperson lookups: {ex.Message}", ex);
-            }
+                    BusinessCentralDefaults.ApiServiceNames.Salespersons),
+                "Error retrieving salesperson lookups");
         }
     }
 }

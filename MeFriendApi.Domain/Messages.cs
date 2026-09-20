@@ -1,6 +1,6 @@
 ﻿namespace MeFriendApi.Domain
 {
-    public class Messages
+    public static class Messages
     {
         public const string Wrong = "Something went wrong";
         public const string UserAccessFail = "You don't have access";
@@ -9,5 +9,8 @@
         public const string Restrict = "Access Denied";
         public const string NotFound = "The item Not Found";
         public const string Error = "An unexpected error occurred. Please try again later.";
+        public const string InternalServerErrorPrefix = "Internal server error: ";
+        public const string ProductDimensionNotFound = "Product dimension was not found.";
+        public const string DefaultResponse = "Something went wrong..";
     }
 }

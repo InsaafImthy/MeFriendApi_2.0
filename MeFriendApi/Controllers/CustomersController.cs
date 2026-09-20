@@ -6,55 +6,27 @@ namespace MeFriendApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class CustomersController : ControllerBase
+    public class CustomersController : ApiControllerBase
     {
         private readonly ICustomersService _customersService;
-        public CustomersController(ICustomersService customersService) 
+        public CustomersController(
+            ICustomersService customersService,
+            ILogger<ApiControllerBase> logger)
+            : base(logger)
         {
             _customersService = customersService;
         }
 
         [HttpGet]
-        public async Task<IActionResult>
-            GetCustomers()
-        {
-            try
-            {
-                var customers = await _customersService.GetCustomers();
-                return Ok(customers);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+        public Task<IActionResult> GetCustomers() =>
+            ExecuteAsync(_customersService.GetCustomers);
 
         [HttpGet("lookup")]
-        public async Task<IActionResult> GetCustomerLookups()
-        {
-            try
-            {
-                var customers = await _customersService.GetCustomerLookupsAsync();
-                return Ok(customers);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+        public Task<IActionResult> GetCustomerLookups() =>
+            ExecuteAsync(_customersService.GetCustomerLookupsAsync);
 
         [HttpPost]
-        public async Task<IActionResult> CreateCustomer(CreateCustomerRequest request)
-        {
-            try
-            {
-                var customer = await _customersService.CreateCustomerAsync(request);
-                return Ok(customer);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+        public Task<IActionResult> CreateCustomer(CreateCustomerRequest request) =>
+            ExecuteAsync(() => _customersService.CreateCustomerAsync(request));
     }
 }

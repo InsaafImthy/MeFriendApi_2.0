@@ -5,41 +5,24 @@ namespace MeFriendApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class SalespersonsController : ControllerBase
+    public class SalespersonsController : ApiControllerBase
     {
         private readonly ISalespersonsService _salespersonsService;
 
-        public SalespersonsController(ISalespersonsService salespersonsService)
+        public SalespersonsController(
+            ISalespersonsService salespersonsService,
+            ILogger<ApiControllerBase> logger)
+            : base(logger)
         {
             _salespersonsService = salespersonsService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetSalespersons()
-        {
-            try
-            {
-                var salespersons = await _salespersonsService.GetSalespersonsAsync();
-                return Ok(salespersons);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+        public Task<IActionResult> GetSalespersons() =>
+            ExecuteAsync(_salespersonsService.GetSalespersonsAsync);
 
         [HttpGet("lookup")]
-        public async Task<IActionResult> GetSalespersonLookups()
-        {
-            try
-            {
-                var salespersons = await _salespersonsService.GetSalespersonLookupsAsync();
-                return Ok(salespersons);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+        public Task<IActionResult> GetSalespersonLookups() =>
+            ExecuteAsync(_salespersonsService.GetSalespersonLookupsAsync);
     }
 }

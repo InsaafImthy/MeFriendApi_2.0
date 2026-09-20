@@ -1,6 +1,6 @@
 ﻿namespace MeFriendApi.Domain
 {
-    public class Constants
+    public static class Constants
     {
         public enum BcWebServiceProtocol
         {

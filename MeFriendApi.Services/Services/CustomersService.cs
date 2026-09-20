@@ -1,4 +1,5 @@
 ﻿using MeFriendApi.Domain.Dto;
+using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Interfaces;
 using static MeFriendApi.Domain.Constants;
 
@@ -14,48 +15,32 @@ namespace MeFriendApi.Services.Services
 
         public async Task<IEnumerable<Customers>> GetCustomers()
         {
-            try
-            {
-                var customers = await _d365CommonService.GetDataFromBc<Customers>(
-                    "/customerMasters",
-                    "",
-                    BcWebServiceProtocol.CustomerMasterV1);
-                return customers;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving customers: {ex.Message}", ex);
-            }
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<Customers>(
+                    BusinessCentralDefaults.ApiPaths.Customers,
+                    BusinessCentralDefaults.Queries.None,
+                    BcWebServiceProtocol.CustomerMasterV1),
+                "Error retrieving customers");
         }
 
         public async Task<IEnumerable<CustomerLookupDto>> GetCustomerLookupsAsync()
         {
-            try
-            {
-                return await _d365CommonService.GetDataFromBc<CustomerLookupDto>(
-                    "/customerMasters",
-                    "?$select=number,name",
-                    BcWebServiceProtocol.CustomerMasterV1);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error retrieving customer lookups: {ex.Message}", ex);
-            }
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetDataFromBc<CustomerLookupDto>(
+                    BusinessCentralDefaults.ApiPaths.Customers,
+                    BusinessCentralDefaults.Queries.CustomerLookup,
+                    BcWebServiceProtocol.CustomerMasterV1),
+                "Error retrieving customer lookups");
         }
 
         public async Task<Customers?> CreateCustomerAsync(CreateCustomerRequest request)
         {
-            try
-            {
-                return await _d365CommonService.PostDataToBc<CreateCustomerRequest, Customers>(
-                    "/customerMasters",
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.PostDataToBc<CreateCustomerRequest, Customers>(
+                    BusinessCentralDefaults.ApiPaths.Customers,
                     request,
-                    BcWebServiceProtocol.CustomerMasterV1);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error creating customer: {ex.Message}", ex);
-            }
+                    BcWebServiceProtocol.CustomerMasterV1),
+                "Error creating customer");
         }
     }
 }
