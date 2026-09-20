@@ -15,8 +15,12 @@ namespace MeFriendApi.Services
 
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
+            services.AddDataProtection();
+            services.AddHttpContextAccessor();
             services.AddHttpClient(BusinessCentralDefaults.HttpClientName);
             services.AddTransient<UserAuthMiddleware>();
+            services.AddScoped<IBusinessCentralCompanyContext, BusinessCentralCompanyContext>();
+            services.AddSingleton<IBusinessCentralContinuationTokenService, BusinessCentralContinuationTokenService>();
             services.AddScoped<ID365CommonService, D365CommonService>();
             services.AddScoped<ICustomersService, CustomersService>();
             services.AddScoped<IItemMastersService, ItemMastersService>();

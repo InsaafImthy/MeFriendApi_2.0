@@ -18,11 +18,17 @@ namespace MeFriendApi.Controllers
         }
 
         [HttpGet]
-        public Task<IActionResult> GetItemMasters() =>
-            ExecuteAsync(_itemMastersService.GetItemMastersAsync);
+        public Task<IActionResult> GetItemMasters(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _itemMastersService.GetItemMastersAsync(request));
 
         [HttpGet("lookup")]
-        public Task<IActionResult> GetItemMasterLookups() =>
-            ExecuteAsync(_itemMastersService.GetItemMasterLookupsAsync);
+        public Task<IActionResult> GetItemMasterLookups(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _itemMastersService.GetItemMasterLookupsAsync(request));
+
+        [HttpGet("{id}")]
+        public Task<IActionResult> GetItemMaster(string id) =>
+            ExecuteAsync(() => _itemMastersService.GetItemMasterAsync(id));
     }
 }

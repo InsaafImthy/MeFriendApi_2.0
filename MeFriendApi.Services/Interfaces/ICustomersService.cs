@@ -4,8 +4,11 @@ namespace MeFriendApi.Services.Interfaces
 {
     public interface ICustomersService
     {
-        Task<IEnumerable<Customers>> GetCustomers();
-        Task<IEnumerable<CustomerLookupDto>> GetCustomerLookupsAsync();
+        Task<MeFriendApi.Domain.Dto.Paging.PagedResult<Customers>> GetCustomers(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request);
+        Task<MeFriendApi.Domain.Dto.Paging.PagedResult<CustomerLookupDto>> GetCustomerLookupsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request);
+        Task<Customers?> GetCustomerAsync(string id);
         Task<Customers?> CreateCustomerAsync(CreateCustomerRequest request);
     }
 }

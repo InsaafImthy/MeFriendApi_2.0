@@ -5,6 +5,9 @@ namespace MeFriendApi.Domain.Dto.Helpers
     public class BcODataResponse<T>
     {
         public List<T> Value { get; set; } = new();
+
+        [JsonPropertyName("@odata.nextLink")]
+        public string? NextLink { get; set; }
     }
 
     public class CompanyDto

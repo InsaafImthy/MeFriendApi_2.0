@@ -4,6 +4,8 @@ namespace MeFriendApi.Services.Interfaces
 {
     public interface ISalesInvoicesService
     {
-        Task<IEnumerable<SalesInvoiceDto>> GetSalesInvoicesAsync();
+        Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalesInvoiceDto>> GetSalesInvoicesAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request);
+        Task<SalesInvoiceDto?> GetSalesInvoiceAsync(string id);
     }
 }

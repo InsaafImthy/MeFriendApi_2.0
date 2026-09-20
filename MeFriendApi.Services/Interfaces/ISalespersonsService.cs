@@ -4,7 +4,10 @@ namespace MeFriendApi.Services.Interfaces
 {
     public interface ISalespersonsService
     {
-        Task<IEnumerable<SalespersonDto>> GetSalespersonsAsync();
-        Task<IEnumerable<SalespersonLookupDto>> GetSalespersonLookupsAsync();
+        Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalespersonDto>> GetSalespersonsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request);
+        Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalespersonLookupDto>> GetSalespersonLookupsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request);
+        Task<SalespersonDto?> GetSalespersonAsync(string id);
     }
 }

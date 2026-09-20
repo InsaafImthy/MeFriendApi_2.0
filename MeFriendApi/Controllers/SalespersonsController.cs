@@ -18,11 +18,17 @@ namespace MeFriendApi.Controllers
         }
 
         [HttpGet]
-        public Task<IActionResult> GetSalespersons() =>
-            ExecuteAsync(_salespersonsService.GetSalespersonsAsync);
+        public Task<IActionResult> GetSalespersons(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _salespersonsService.GetSalespersonsAsync(request));
 
         [HttpGet("lookup")]
-        public Task<IActionResult> GetSalespersonLookups() =>
-            ExecuteAsync(_salespersonsService.GetSalespersonLookupsAsync);
+        public Task<IActionResult> GetSalespersonLookups(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _salespersonsService.GetSalespersonLookupsAsync(request));
+
+        [HttpGet("{id}")]
+        public Task<IActionResult> GetSalesperson(string id) =>
+            ExecuteAsync(() => _salespersonsService.GetSalespersonAsync(id));
     }
 }

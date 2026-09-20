@@ -11,6 +11,20 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("no")]
         public string? No { get; set; }
 
+        // The custom salesOrders API currently exposes the BC property as "number".
+        // Keep the public API's established "no" property while accepting that wire name.
+        [JsonPropertyName("number")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? BusinessCentralNumber
+        {
+            get => null;
+            set
+            {
+                if (string.IsNullOrWhiteSpace(No))
+                    No = value;
+            }
+        }
+
         [JsonPropertyName("sellToCustomerNo")]
         public string? SellToCustomerNo { get; set; }
 

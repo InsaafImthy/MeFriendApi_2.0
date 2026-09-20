@@ -13,24 +13,48 @@ namespace MeFriendApi.Services.Services
             _d365CommonService = d365CommonService;
         }
 
-        public async Task<IEnumerable<Customers>> GetCustomers()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<Customers>> GetCustomers(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.Customers(request);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<Customers>(
+                () => _d365CommonService.GetPagedDataFromBc<Customers>(
                     BusinessCentralDefaults.ApiPaths.Customers,
-                    BusinessCentralDefaults.Queries.None,
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
                     BcWebServiceProtocol.CustomerMasterV1),
                 "Error retrieving customers");
         }
 
-        public async Task<IEnumerable<CustomerLookupDto>> GetCustomerLookupsAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<CustomerLookupDto>> GetCustomerLookupsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.Customers(request, lookup: true);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<CustomerLookupDto>(
+                () => _d365CommonService.GetPagedDataFromBc<CustomerLookupDto>(
                     BusinessCentralDefaults.ApiPaths.Customers,
-                    BusinessCentralDefaults.Queries.CustomerLookup,
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
                     BcWebServiceProtocol.CustomerMasterV1),
                 "Error retrieving customer lookups");
+        }
+
+        public async Task<Customers?> GetCustomerAsync(string id)
+        {
+            var isGuid = Guid.TryParse(id, out _);
+            var query = ODataQueryBuilder.BuildSingleFilter(
+                isGuid ? "id" : "number",
+                id,
+                isGuid);
+
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetSingleDataFromBc<Customers>(
+                    BusinessCentralDefaults.ApiPaths.Customers,
+                    query,
+                    BcWebServiceProtocol.CustomerMasterV1),
+                "Error retrieving customer");
         }
 
         public async Task<Customers?> CreateCustomerAsync(CreateCustomerRequest request)

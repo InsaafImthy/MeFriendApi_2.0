@@ -1,3 +1,5 @@
+using MeFriendApi.Domain.Exceptions;
+
 namespace MeFriendApi.Services.Infrastructure
 {
     internal static class ServiceOperationExecutor
@@ -9,6 +11,10 @@ namespace MeFriendApi.Services.Infrastructure
             try
             {
                 return await operation();
+            }
+            catch (BadRequestException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

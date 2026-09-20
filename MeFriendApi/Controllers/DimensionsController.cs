@@ -1,4 +1,3 @@
-using MeFriendApi.Domain;
 using MeFriendApi.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,18 +18,12 @@ namespace MeFriendApi.Controllers
         }
 
         [HttpGet]
-        public Task<IActionResult> GetDimensions() =>
-            ExecuteAsync(async () =>
-            {
-                var dimensions = await _dimensionsService.GetDimensionsAsync();
-                var productDimension = dimensions.FirstOrDefault();
+        public Task<IActionResult> GetDimensions(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _dimensionsService.GetDimensionsAsync(request));
 
-                if (productDimension == null)
-                {
-                    return NotFound(Messages.ProductDimensionNotFound);
-                }
-
-                return Ok(productDimension);
-            });
+        [HttpGet("{id}")]
+        public Task<IActionResult> GetDimension(string id) =>
+            ExecuteAsync(() => _dimensionsService.GetDimensionAsync(id));
     }
 }

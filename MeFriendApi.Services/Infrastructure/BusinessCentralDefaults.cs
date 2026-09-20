@@ -11,6 +11,16 @@ namespace MeFriendApi.Services.Infrastructure
         internal const string MatchAnyEtag = "*";
         internal const string FileFormFieldName = "file";
         internal const string ODataCollectionPropertyName = "value";
+        internal const string PreferHeaderName = "Prefer";
+        internal const string ODataMaxPageSizePreference = "odata.maxpagesize={0}";
+        internal const int DefaultPageSize = 20;
+        internal const int MaximumPageSize = 100;
+
+        internal static class HeaderNames
+        {
+            internal const string CompanyId = "X-BC-Company-Id";
+            internal const string CompanyName = "X-BC-Company-Name";
+        }
 
         internal static class ConfigurationKeys
         {
@@ -18,14 +28,6 @@ namespace MeFriendApi.Services.Infrastructure
             internal const string ClientSecret = "AzureAd:ClientSecret";
             internal const string TenantId = "AzureAd:TenantId";
             internal const string BaseUrl = "AzureAd:BaseUrl";
-            internal const string CompanyId = "CompanyInfo:CompanyId";
-            internal const string CompanyName = "CompanyInfo:CompanyName";
-
-            internal static string ApiServiceUrl(string serviceName) =>
-                $"BusinessCentralApiServices:{serviceName}:Url";
-
-            internal static string ODataServiceUrl(string serviceName) =>
-                $"BusinessCentralODataServices:{serviceName}:Url";
         }
 
         internal static class ProtocolPaths
@@ -45,23 +47,8 @@ namespace MeFriendApi.Services.Infrastructure
             internal const string SalesOrders = "/salesOrders";
             internal const string Salespersons = "/salespersons";
             internal const string Attachments = "/Attachments";
+            internal const string DimensionValues = "/dimensionvalues";
         }
 
-        internal static class Queries
-        {
-            internal const string None = "";
-            internal const string CustomerLookup = "?$select=number,name";
-            internal const string DimensionsWithValues = "?$filter=code%20eq%20%27PRODUCT%27&$expand=dimensionvalues";
-            internal const string ItemMasterLookup = "?$select=number,description,unitPrice";
-            internal const string SalesInvoicesWithLines = "?$expand=SalesInvoiceLines";
-            internal const string SalespersonLookup = "?$select=code,name";
-        }
-
-        internal static class ApiServiceNames
-        {
-            internal const string Dimensions = "Dimensions";
-            internal const string SalesInvoices = "SalesInvoices";
-            internal const string Salespersons = "Salespersons";
-        }
     }
 }

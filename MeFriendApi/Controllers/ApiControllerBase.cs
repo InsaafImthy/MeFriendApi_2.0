@@ -1,4 +1,5 @@
 using MeFriendApi.Domain;
+using MeFriendApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,11 @@ namespace MeFriendApi.Controllers
             {
                 return Ok(await operation());
             }
+            catch (BadRequestException ex)
+            {
+                LogActionFailure(ex);
+                return BadRequest(ex.Message);
+            }
             catch (Exception ex)
             {
                 LogActionFailure(ex);
@@ -33,6 +39,11 @@ namespace MeFriendApi.Controllers
             try
             {
                 return await operation();
+            }
+            catch (BadRequestException ex)
+            {
+                LogActionFailure(ex);
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {

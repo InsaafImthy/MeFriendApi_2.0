@@ -1,5 +1,5 @@
-﻿using MeFriendApi.Domain.Dto;
-using MeFriendApi.Domain.Dto.Helpers;
+﻿using MeFriendApi.Domain.Dto.Helpers;
+using MeFriendApi.Domain.Dto.Paging;
 using MeFriendApi.Domain.DTO;
 using MeFriendApi.Domain.Exceptions;
 using MeFriendApi.Services.Infrastructure;
@@ -33,18 +33,26 @@ namespace MeFriendApi.Services.Services
 
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IBusinessCentralCompanyContext _companyContext;
+        private readonly IBusinessCentralContinuationTokenService _continuationTokenService;
         private readonly Lazy<IConfidentialClientApplication> _confidentialClientApplication;
 
-        public D365CommonService(IConfiguration configuration, IHttpClientFactory httpClientFactory)
+        public D365CommonService(
+            IConfiguration configuration,
+            IHttpClientFactory httpClientFactory,
+            IBusinessCentralCompanyContext companyContext,
+            IBusinessCentralContinuationTokenService continuationTokenService)
         {
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
+            _companyContext = companyContext;
+            _continuationTokenService = continuationTokenService;
             _confidentialClientApplication = new Lazy<IConfidentialClientApplication>(
                 CreateConfidentialClientApplication,
                 LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
-        public async Task<string> GetAccessToken()
+        public virtual async Task<string> GetAccessToken()
         {
             var result = await _confidentialClientApplication.Value
                 .AcquireTokenForClient(AccessTokenScopes)
@@ -53,59 +61,56 @@ namespace MeFriendApi.Services.Services
             return result.AccessToken;
         }
 
-        public async Task<List<T>> GetDataFromBc<T>(
+        public Task<PagedResult<T>> GetPagedDataFromBc<T>(
             string apiPath,
-            string? filter = "",
-            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2,
-            string? apiServiceName = null)
+            int? pageSize = null,
+            string? continuationToken = null,
+            string? queryString = null,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2)
+        {
+            var initialUrl = BuildApiUrl(apiPath, bcWebServiceProtocol);
+            return GetPagedDataCoreAsync<T>(
+                initialUrl,
+                apiPath,
+                bcWebServiceProtocol,
+                pageSize,
+                continuationToken,
+                queryString,
+                $"GET {apiPath}");
+        }
+
+        public async Task<T?> GetSingleDataFromBc<T>(
+            string apiPath,
+            string? queryString = null,
+            BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V2)
         {
             try
             {
+                var url = AppendQueryString(BuildApiUrl(apiPath, bcWebServiceProtocol), queryString);
                 var token = await GetAccessToken();
-
                 var client = CreateBusinessCentralClient(token);
 
-                string url;
-                if (!string.IsNullOrWhiteSpace(apiServiceName))
-                {
-                    url = _configuration[
-                            BusinessCentralDefaults.ConfigurationKeys.ApiServiceUrl(apiServiceName)]
-                        ?? throw new InternalException(
-                            $"Business Central API URL configuration is missing for '{apiServiceName}'.");
-                }
-                else
-                {
-                    url = BuildApiUrl(apiPath, bcWebServiceProtocol);
-                }
-
-                url = AppendQueryString(url, filter);
-
                 using var response = await client.GetAsync(url);
-
                 await EnsureBusinessCentralSuccessAsync(response, $"GET {apiPath}");
 
                 var json = await response.Content.ReadAsStringAsync();
-
                 using var document = JsonDocument.Parse(json);
 
-                var root = document.RootElement;
-
-                // Collection response
-                if (root.TryGetProperty(BusinessCentralDefaults.ODataCollectionPropertyName, out _))
+                if (document.RootElement.TryGetProperty(
+                        BusinessCentralDefaults.ODataCollectionPropertyName,
+                        out _))
                 {
-                    var result = JsonSerializer.Deserialize<BcODataResponse<T>>(
+                    var collection = JsonSerializer.Deserialize<BcODataResponse<T>>(
                         json,
                         DeserializationOptions);
-
-                    return result?.Value ?? new List<T>();
+                    return collection == null ? default : collection.Value.FirstOrDefault();
                 }
 
-                // Single object response
-                var singleObject = JsonSerializer.Deserialize<T>(json, DeserializationOptions);
-
-                return singleObject != null
-                    ? new List<T> { singleObject }
-                    : new List<T>();
+                return JsonSerializer.Deserialize<T>(json, DeserializationOptions);
+            }
+            catch (BadRequestException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -118,11 +123,11 @@ namespace MeFriendApi.Services.Services
             TRequest payload,
             BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
         {
+            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
+
             var token = await GetAccessToken();
 
             var client = CreateBusinessCentralClient(token);
-
-            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
 
             var json = JsonSerializer.Serialize(payload, SerializationOptions);
             using var content = new StringContent(
@@ -138,46 +143,21 @@ namespace MeFriendApi.Services.Services
             return JsonSerializer.Deserialize<TResponse>(responseJson, DeserializationOptions);
         }
 
-        public async Task<List<T>> GetFromODataServiceAsync<T>(
+        public Task<PagedResult<T>> GetPagedFromODataServiceAsync<T>(
             string serviceName,
+            int? pageSize = null,
+            string? continuationToken = null,
             string? queryString = null)
         {
-            try
-            {
-                var token = await GetAccessToken();
-
-                var client = CreateBusinessCentralClient(token);
-
-                var url = BuildNamedODataServiceUrl(serviceName, queryString);
-
-                using var response = await client.GetAsync(url);
-                await EnsureBusinessCentralSuccessAsync(response, $"GET ODataV4/{serviceName}");
-
-                var json = await response.Content.ReadAsStringAsync();
-
-                using var document = JsonDocument.Parse(json);
-                var root = document.RootElement;
-
-                if (root.TryGetProperty(BusinessCentralDefaults.ODataCollectionPropertyName, out _))
-                {
-                    var result = JsonSerializer.Deserialize<BcODataResponse<T>>(
-                        json,
-                        DeserializationOptions);
-                    return result?.Value ?? new List<T>();
-                }
-
-                var singleObject = JsonSerializer.Deserialize<T>(json, DeserializationOptions);
-
-                return singleObject != null
-                    ? new List<T> { singleObject }
-                    : new List<T>();
-            }
-            catch (Exception ex)
-            {
-                throw new InternalException(
-                    $"Failed to get response from Business Central OData service '{serviceName}': {ex.Message}",
-                    ex);
-            }
+            var initialUrl = BuildNamedODataServiceUrl(serviceName);
+            return GetPagedDataCoreAsync<T>(
+                initialUrl,
+                $"ODataV4/{serviceName}",
+                BcWebServiceProtocol.ODataV4,
+                pageSize,
+                continuationToken,
+                queryString,
+                $"GET ODataV4/{serviceName}");
         }
 
         public async Task<TResponse?> PostToODataServiceAsync<TRequest, TResponse>(
@@ -187,11 +167,11 @@ namespace MeFriendApi.Services.Services
         {
             try
             {
+                var url = BuildNamedODataServiceUrl(serviceName, queryString);
+
                 var token = await GetAccessToken();
 
                 var client = CreateBusinessCentralClient(token);
-
-                var url = BuildNamedODataServiceUrl(serviceName, queryString);
 
                 var json = JsonSerializer.Serialize(payload, SerializationOptions);
                 using var content = new StringContent(
@@ -209,6 +189,10 @@ namespace MeFriendApi.Services.Services
 
                 return JsonSerializer.Deserialize<TResponse>(responseJson, DeserializationOptions);
             }
+            catch (BadRequestException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 throw new InternalException(
@@ -223,6 +207,8 @@ namespace MeFriendApi.Services.Services
             string? etag = null,
             BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
         {
+            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
+
             var token = await GetAccessToken();
 
             var client = CreateBusinessCentralClient(token);
@@ -230,8 +216,6 @@ namespace MeFriendApi.Services.Services
             client.DefaultRequestHeaders.TryAddWithoutValidation(
                 BusinessCentralDefaults.IfMatchHeaderName,
                 BusinessCentralDefaults.MatchAnyEtag);
-            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
-
             var json = JsonSerializer.Serialize(payload, SerializationOptions);
 
             using var content = new StringContent(
@@ -266,6 +250,8 @@ namespace MeFriendApi.Services.Services
             string? etag = null,
             BcWebServiceProtocol? bcWebServiceProtocol = BcWebServiceProtocol.V1)
         {
+            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
+
             var token = await GetAccessToken();
 
             var client = CreateBusinessCentralClient(token);
@@ -273,8 +259,6 @@ namespace MeFriendApi.Services.Services
             client.DefaultRequestHeaders.TryAddWithoutValidation(
                 BusinessCentralDefaults.IfMatchHeaderName,
                 BusinessCentralDefaults.MatchAnyEtag);
-
-            var url = BuildApiUrl(apiPath, bcWebServiceProtocol);
 
             using var response = await client.DeleteAsync(url);
 
@@ -291,13 +275,13 @@ namespace MeFriendApi.Services.Services
                 if (file == null || file.Length == 0)
                     throw new BadRequestException("File is required.");
 
-                var token = await GetAccessToken();
-
-                var client = CreateBusinessCentralClient(token);
-
                 var url = BuildApiUrl(
                     $"{filePathWithItemId}{BusinessCentralDefaults.ApiPaths.Attachments}",
                     bcWebServiceProtocol);
+
+                var token = await GetAccessToken();
+
+                var client = CreateBusinessCentralClient(token);
 
                 await using var stream = file.OpenReadStream();
 
@@ -333,6 +317,10 @@ namespace MeFriendApi.Services.Services
                     responseContent,
                     DeserializationOptions);
             }
+            catch (BadRequestException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 throw new InternalException(
@@ -340,6 +328,211 @@ namespace MeFriendApi.Services.Services
                     ex);
             }
         }
+
+        private async Task<PagedResult<T>> GetPagedDataCoreAsync<T>(
+            string initialUrl,
+            string resourceKey,
+            BcWebServiceProtocol? protocol,
+            int? requestedPageSize,
+            string? continuationToken,
+            string? queryString,
+            string operation)
+        {
+            try
+            {
+                var normalizedQuery = NormalizeQueryString(queryString);
+                var collectionUrl = AppendQueryString(initialUrl, normalizedQuery);
+                var effectivePageSize = ValidatePageSize(requestedPageSize);
+                string requestUrl;
+
+                if (string.IsNullOrWhiteSpace(continuationToken))
+                {
+                    requestUrl = collectionUrl;
+                }
+                else
+                {
+                    var tokenData = _continuationTokenService.Unprotect(continuationToken);
+                    ValidateTokenContext(
+                        tokenData,
+                        resourceKey,
+                        protocol,
+                        normalizedQuery,
+                        requestedPageSize);
+                    effectivePageSize = tokenData.PageSize;
+                    requestUrl = ValidateContinuationUrl(tokenData.NextLink, collectionUrl).AbsoluteUri;
+                }
+
+                var accessToken = await GetAccessToken();
+                var client = CreateBusinessCentralClient(accessToken);
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
+                request.Headers.TryAddWithoutValidation(
+                    BusinessCentralDefaults.PreferHeaderName,
+                    string.Format(
+                        BusinessCentralDefaults.ODataMaxPageSizePreference,
+                        effectivePageSize));
+
+                using var response = await client.SendAsync(request);
+                await EnsureBusinessCentralSuccessAsync(response, operation);
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(json);
+                if (!document.RootElement.TryGetProperty(
+                        BusinessCentralDefaults.ODataCollectionPropertyName,
+                        out var valueElement) ||
+                    valueElement.ValueKind != JsonValueKind.Array)
+                {
+                    throw new InternalException(
+                        $"Business Central returned a non-collection response for {operation}.");
+                }
+
+                var bcPage = JsonSerializer.Deserialize<BcODataResponse<T>>(
+                    json,
+                    DeserializationOptions)
+                    ?? throw new InternalException(
+                        $"Business Central returned an invalid collection response for {operation}.");
+
+                if (bcPage.Value == null)
+                {
+                    throw new InternalException(
+                        $"Business Central returned an invalid collection value for {operation}.");
+                }
+
+                string? nextToken = null;
+                if (!string.IsNullOrWhiteSpace(bcPage.NextLink))
+                {
+                    var validatedNextLink = ValidateContinuationUrl(
+                        bcPage.NextLink,
+                        collectionUrl);
+
+                    nextToken = _continuationTokenService.Protect(
+                        new BusinessCentralContinuationToken(
+                            validatedNextLink.AbsoluteUri,
+                            _companyContext.CompanyId,
+                            _companyContext.CompanyName,
+                            resourceKey,
+                            (int)(protocol ?? BcWebServiceProtocol.V2),
+                            normalizedQuery,
+                            effectivePageSize));
+                }
+
+                return new PagedResult<T>
+                {
+                    Items = bcPage.Value,
+                    PageSize = effectivePageSize,
+                    HasNext = nextToken != null,
+                    NextToken = nextToken
+                };
+            }
+            catch (BadRequestException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is not InternalException)
+            {
+                throw new InternalException($"Failed to get paged response: {ex.Message}", ex);
+            }
+        }
+
+        private void ValidateTokenContext(
+            BusinessCentralContinuationToken token,
+            string resourceKey,
+            BcWebServiceProtocol? protocol,
+            string queryString,
+            int? requestedPageSize)
+        {
+            if (token.CompanyId != _companyContext.CompanyId ||
+                !string.Equals(
+                    token.CompanyName,
+                    _companyContext.CompanyName,
+                    StringComparison.Ordinal))
+            {
+                throw new BadRequestException(
+                    "The continuation token belongs to a different Business Central company.");
+            }
+
+            if (!string.Equals(token.ApiPath, resourceKey, StringComparison.Ordinal) ||
+                token.Protocol != (int)(protocol ?? BcWebServiceProtocol.V2))
+            {
+                throw new BadRequestException(
+                    "The continuation token does not belong to this Business Central collection.");
+            }
+
+            if (!string.Equals(token.QueryString, queryString, StringComparison.Ordinal))
+            {
+                throw new BadRequestException(
+                    "Search, filters, or sorting changed. Start a new paging sequence without a continuation token.");
+            }
+
+            if (requestedPageSize.HasValue && requestedPageSize.Value != token.PageSize)
+            {
+                throw new BadRequestException(
+                    "pageSize cannot change while using a continuation token.");
+            }
+
+            ValidatePageSize(token.PageSize);
+        }
+
+        private Uri ValidateContinuationUrl(string nextLink, string collectionUrl)
+        {
+            if (!Uri.TryCreate(collectionUrl, UriKind.Absolute, out var collectionUri))
+                throw new InternalException("The configured Business Central collection URL is invalid.");
+
+            if (!Uri.TryCreate(nextLink, UriKind.Absolute, out var continuationUri))
+            {
+                if (!Uri.TryCreate(collectionUri, nextLink, out continuationUri))
+                    throw new BadRequestException("The Business Central continuation URL is invalid.");
+            }
+
+            if (!Uri.TryCreate(GetBaseUrl(), UriKind.Absolute, out var configuredBaseUri))
+                throw new InternalException("The configured Business Central base URL is invalid.");
+
+            if (!string.IsNullOrEmpty(continuationUri.UserInfo) ||
+                !string.Equals(continuationUri.Scheme, configuredBaseUri.Scheme, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(continuationUri.Host, configuredBaseUri.Host, StringComparison.OrdinalIgnoreCase) ||
+                continuationUri.Port != configuredBaseUri.Port)
+            {
+                throw new BadRequestException(
+                    "The continuation token contains an unauthorized Business Central URL.");
+            }
+
+            var environmentPath = configuredBaseUri.AbsolutePath.TrimEnd('/');
+            var isWithinEnvironment = continuationUri.AbsolutePath.Equals(
+                    environmentPath,
+                    StringComparison.OrdinalIgnoreCase) ||
+                continuationUri.AbsolutePath.StartsWith(
+                    $"{environmentPath}/",
+                    StringComparison.OrdinalIgnoreCase);
+
+            if (!isWithinEnvironment ||
+                !continuationUri.AbsolutePath.Equals(
+                    collectionUri.AbsolutePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BadRequestException(
+                    "The continuation token does not belong to the configured Business Central environment and collection.");
+            }
+
+            return continuationUri;
+        }
+
+        private static int ValidatePageSize(int? requestedPageSize)
+        {
+            var pageSize = requestedPageSize ?? BusinessCentralDefaults.DefaultPageSize;
+
+            if (pageSize < 1 || pageSize > BusinessCentralDefaults.MaximumPageSize)
+            {
+                throw new BadRequestException(
+                    $"pageSize must be between 1 and {BusinessCentralDefaults.MaximumPageSize}.");
+            }
+
+            return pageSize;
+        }
+
+        private static string NormalizeQueryString(string? queryString) =>
+            string.IsNullOrWhiteSpace(queryString)
+                ? string.Empty
+                : queryString.Trim().TrimStart('?', '&');
 
         private HttpClient CreateBusinessCentralClient(string token)
         {
@@ -385,7 +578,7 @@ namespace MeFriendApi.Services.Services
             string apiPath,
             BcWebServiceProtocol? bcWebServiceProtocol)
         {
-            var baseUrl = _configuration[BusinessCentralDefaults.ConfigurationKeys.BaseUrl];
+            var baseUrl = GetBaseUrl();
             var protocolPath = GetProtocolPath(bcWebServiceProtocol);
 
             return $"{baseUrl}/{protocolPath}{apiPath}";
@@ -393,49 +586,49 @@ namespace MeFriendApi.Services.Services
 
         private string GetProtocolPath(BcWebServiceProtocol? bcWebServiceProtocol)
         {
-            var companyId = _configuration[BusinessCentralDefaults.ConfigurationKeys.CompanyId];
-
             return bcWebServiceProtocol switch
             {
                 BcWebServiceProtocol.V2 => BusinessCentralDefaults.ProtocolPaths.V2,
                 BcWebServiceProtocol.ODataV4 => string.Format(
                     BusinessCentralDefaults.ProtocolPaths.ODataV4,
-                    _configuration[BusinessCentralDefaults.ConfigurationKeys.CompanyName]),
+                    EncodeODataPathCompanyName(_companyContext.CompanyName)),
                 BcWebServiceProtocol.V1 => string.Format(
                     BusinessCentralDefaults.ProtocolPaths.V1,
-                    companyId),
+                    _companyContext.CompanyId),
                 BcWebServiceProtocol.ItemMasterV1 or BcWebServiceProtocol.CustomerMasterV1 =>
-                    string.Format(BusinessCentralDefaults.ProtocolPaths.MefriendV1, companyId),
+                    string.Format(
+                        BusinessCentralDefaults.ProtocolPaths.MefriendV1,
+                        _companyContext.CompanyId),
                 _ => throw new ArgumentOutOfRangeException(nameof(bcWebServiceProtocol))
             };
         }
 
         private string BuildNamedODataServiceUrl(string serviceName, string? queryString = null)
         {
-            var configuredServiceUrl = _configuration[
-                BusinessCentralDefaults.ConfigurationKeys.ODataServiceUrl(serviceName)];
-
-            if (!string.IsNullOrWhiteSpace(configuredServiceUrl))
-            {
-                return AppendQueryString(configuredServiceUrl, queryString);
-            }
-
-            var baseUrl = _configuration[BusinessCentralDefaults.ConfigurationKeys.BaseUrl]?.TrimEnd('/');
-            var companyName =
-                _configuration[BusinessCentralDefaults.ConfigurationKeys.CompanyName];
-
-            if (string.IsNullOrWhiteSpace(baseUrl))
-                throw new InternalException(
-                    $"{BusinessCentralDefaults.ConfigurationKeys.BaseUrl} configuration value is missing.");
-
-            if (string.IsNullOrWhiteSpace(companyName))
-                throw new InternalException(
-                    $"{BusinessCentralDefaults.ConfigurationKeys.CompanyName} configuration value is missing.");
-
-            var encodedCompanyName = Uri.EscapeDataString(Uri.UnescapeDataString(companyName));
+            var baseUrl = GetBaseUrl();
+            var encodedCompanyName = Uri.EscapeDataString(_companyContext.CompanyName);
             var url = $"{baseUrl}/ODataV4/{serviceName}?company={encodedCompanyName}";
 
             return AppendQueryString(url, queryString);
+        }
+
+        private string GetBaseUrl()
+        {
+            var baseUrl = _configuration[BusinessCentralDefaults.ConfigurationKeys.BaseUrl];
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                throw new InternalException(
+                    $"{BusinessCentralDefaults.ConfigurationKeys.BaseUrl} configuration value is missing.");
+            }
+
+            return baseUrl.TrimEnd('/');
+        }
+
+        private static string EncodeODataPathCompanyName(string companyName)
+        {
+            var escapedODataLiteral = companyName.Replace("'", "''", StringComparison.Ordinal);
+            return Uri.EscapeDataString(escapedODataLiteral);
         }
 
         private static string AppendQueryString(string url, string? queryString = null)

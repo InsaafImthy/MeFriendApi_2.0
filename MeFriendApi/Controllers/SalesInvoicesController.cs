@@ -18,7 +18,12 @@ namespace MeFriendApi.Controllers
         }
 
         [HttpGet]
-        public Task<IActionResult> GetSalesInvoices() =>
-            ExecuteAsync(_salesInvoicesService.GetSalesInvoicesAsync);
+        public Task<IActionResult> GetSalesInvoices(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _salesInvoicesService.GetSalesInvoicesAsync(request));
+
+        [HttpGet("{id}")]
+        public Task<IActionResult> GetSalesInvoice(string id) =>
+            ExecuteAsync(() => _salesInvoicesService.GetSalesInvoiceAsync(id));
     }
 }

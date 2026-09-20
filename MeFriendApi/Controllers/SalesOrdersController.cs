@@ -19,8 +19,13 @@ namespace MeFriendApi.Controllers
         }
 
         [HttpGet]
-        public Task<IActionResult> GetSalesOrders() =>
-            ExecuteAsync(_salesOrdersService.GetSalesOrdersAsync);
+        public Task<IActionResult> GetSalesOrders(
+            [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
+            ExecuteAsync(() => _salesOrdersService.GetSalesOrdersAsync(request));
+
+        [HttpGet("{id}")]
+        public Task<IActionResult> GetSalesOrder(string id) =>
+            ExecuteAsync(() => _salesOrdersService.GetSalesOrderAsync(id));
 
         [HttpPost]
         public Task<IActionResult> CreateSalesOrder(CreateSalesOrderRequest request) =>

@@ -14,15 +14,33 @@ namespace MeFriendApi.Services.Services
             _d365CommonService = d365CommonService;
         }
 
-        public async Task<IEnumerable<SalesInvoiceDto>> GetSalesInvoicesAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalesInvoiceDto>> GetSalesInvoicesAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.SalesInvoices(request);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<SalesInvoiceDto>(
+                () => _d365CommonService.GetPagedDataFromBc<SalesInvoiceDto>(
                     BusinessCentralDefaults.ApiPaths.SalesInvoices,
-                    BusinessCentralDefaults.Queries.SalesInvoicesWithLines,
-                    BcWebServiceProtocol.V1,
-                    BusinessCentralDefaults.ApiServiceNames.SalesInvoices),
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
+                    BcWebServiceProtocol.V1),
                 "Error retrieving sales invoices");
+        }
+
+        public async Task<SalesInvoiceDto?> GetSalesInvoiceAsync(string id)
+        {
+            var query = ODataQueryBuilder.BuildSingleFilter(
+                "invoiceNo",
+                id,
+                expand: "SalesInvoiceLines");
+
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetSingleDataFromBc<SalesInvoiceDto>(
+                    BusinessCentralDefaults.ApiPaths.SalesInvoices,
+                    query,
+                    BcWebServiceProtocol.V1),
+                "Error retrieving sales invoice");
         }
     }
 }

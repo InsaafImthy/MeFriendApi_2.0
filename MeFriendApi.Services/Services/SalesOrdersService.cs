@@ -14,14 +14,33 @@ namespace MeFriendApi.Services.Services
             _d365CommonService = d365CommonService;
         }
 
-        public async Task<IEnumerable<SalesOrderDto>> GetSalesOrdersAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalesOrderDto>> GetSalesOrdersAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.SalesOrders(request);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<SalesOrderDto>(
+                () => _d365CommonService.GetPagedDataFromBc<SalesOrderDto>(
                     BusinessCentralDefaults.ApiPaths.SalesOrders,
-                    BusinessCentralDefaults.Queries.None,
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
                     BcWebServiceProtocol.CustomerMasterV1),
                 "Error retrieving sales orders");
+        }
+
+        public async Task<SalesOrderDto?> GetSalesOrderAsync(string id)
+        {
+            var query = ODataQueryBuilder.BuildSingleFilter(
+                "number",
+                id,
+                expand: "SalesOrderLines");
+
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetSingleDataFromBc<SalesOrderDto>(
+                    BusinessCentralDefaults.ApiPaths.SalesOrders,
+                    query,
+                    BcWebServiceProtocol.CustomerMasterV1),
+                "Error retrieving sales order");
         }
 
         public async Task<SalesOrderPostResponse?> CreateSalesOrderAsync(CreateSalesOrderRequest request)

@@ -14,26 +14,43 @@ namespace MeFriendApi.Services.Services
             _d365CommonService = d365CommonService;
         }
 
-        public async Task<IEnumerable<SalespersonDto>> GetSalespersonsAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalespersonDto>> GetSalespersonsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.Salespersons(request);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<SalespersonDto>(
+                () => _d365CommonService.GetPagedDataFromBc<SalespersonDto>(
                     BusinessCentralDefaults.ApiPaths.Salespersons,
-                    BusinessCentralDefaults.Queries.None,
-                    BcWebServiceProtocol.V1,
-                    BusinessCentralDefaults.ApiServiceNames.Salespersons),
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
+                    BcWebServiceProtocol.V1),
                 "Error retrieving salespersons");
         }
 
-        public async Task<IEnumerable<SalespersonLookupDto>> GetSalespersonLookupsAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalespersonLookupDto>> GetSalespersonLookupsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.Salespersons(request, lookup: true);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<SalespersonLookupDto>(
+                () => _d365CommonService.GetPagedDataFromBc<SalespersonLookupDto>(
                     BusinessCentralDefaults.ApiPaths.Salespersons,
-                    BusinessCentralDefaults.Queries.SalespersonLookup,
-                    BcWebServiceProtocol.V1,
-                    BusinessCentralDefaults.ApiServiceNames.Salespersons),
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
+                    BcWebServiceProtocol.V1),
                 "Error retrieving salesperson lookups");
+        }
+
+        public async Task<SalespersonDto?> GetSalespersonAsync(string id)
+        {
+            var query = ODataQueryBuilder.BuildSingleFilter("code", id);
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetSingleDataFromBc<SalespersonDto>(
+                    BusinessCentralDefaults.ApiPaths.Salespersons,
+                    query,
+                    BcWebServiceProtocol.V1),
+                "Error retrieving salesperson");
         }
     }
 }

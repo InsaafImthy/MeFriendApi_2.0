@@ -14,24 +14,43 @@ namespace MeFriendApi.Services.Services
             _d365CommonService = d365CommonService;
         }
 
-        public async Task<IEnumerable<ItemMaster>> GetItemMastersAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<ItemMaster>> GetItemMastersAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.ItemMasters(request);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<ItemMaster>(
+                () => _d365CommonService.GetPagedDataFromBc<ItemMaster>(
                     BusinessCentralDefaults.ApiPaths.ItemMasters,
-                    BusinessCentralDefaults.Queries.None,
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
                     BcWebServiceProtocol.ItemMasterV1),
                 "Error retrieving item masters");
         }
 
-        public async Task<IEnumerable<ItemMasterLookupDto>> GetItemMasterLookupsAsync()
+        public async Task<MeFriendApi.Domain.Dto.Paging.PagedResult<ItemMasterLookupDto>> GetItemMasterLookupsAsync(
+            MeFriendApi.Domain.Dto.Paging.PagedRequest request)
         {
+            var query = BusinessCentralListQueries.ItemMasters(request, lookup: true);
             return await ServiceOperationExecutor.ExecuteAsync(
-                () => _d365CommonService.GetDataFromBc<ItemMasterLookupDto>(
+                () => _d365CommonService.GetPagedDataFromBc<ItemMasterLookupDto>(
                     BusinessCentralDefaults.ApiPaths.ItemMasters,
-                    BusinessCentralDefaults.Queries.ItemMasterLookup,
+                    request.PageSize,
+                    request.ContinuationToken,
+                    query,
                     BcWebServiceProtocol.ItemMasterV1),
                 "Error retrieving item master lookups");
+        }
+
+        public async Task<ItemMaster?> GetItemMasterAsync(string id)
+        {
+            var query = ODataQueryBuilder.BuildSingleFilter("number", id);
+            return await ServiceOperationExecutor.ExecuteAsync(
+                () => _d365CommonService.GetSingleDataFromBc<ItemMaster>(
+                    BusinessCentralDefaults.ApiPaths.ItemMasters,
+                    query,
+                    BcWebServiceProtocol.ItemMasterV1),
+                "Error retrieving item master");
         }
     }
 }
