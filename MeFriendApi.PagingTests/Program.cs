@@ -29,11 +29,12 @@ internal sealed class PagingTests
         await ContinuationUrlCannotEscapeEnvironmentAsync();
         await MaximumPageSizeIsEnforcedAsync();
         await CustomerFiltersAndSortingStayServerSideAsync();
+        await SalesInvoiceDateFiltersStayServerSideAsync();
         await CollectionEndpointsUseExactCustomSchemasAsync();
         await InvoiceListAndDetailAreSeparatedAsync();
         await EventsUsePagedNavigationCollectionAsync();
 
-        Console.WriteLine("PASS: 9 Business Central paging test groups completed.");
+        Console.WriteLine("PASS: 10 Business Central paging test groups completed.");
     }
 
     private async Task FirstAndNextPageAsync()
@@ -179,6 +180,63 @@ internal sealed class PagingTests
         Assert(!listQuery.Contains("base64", StringComparison.OrdinalIgnoreCase), "invoice list excludes base64");
         Assert(detailQuery.Contains("$top=1"), "invoice detail is limited to one");
         Assert(detailQuery.Contains("$expand=SalesInvoiceLines"), "invoice detail expands lines");
+    }
+
+    private async Task SalesInvoiceDateFiltersStayServerSideAsync()
+    {
+        var fromHandler = new QueueHandler(Json("{\"value\":[]}"));
+        await new SalesInvoicesService(CreateService(fromHandler, CompanyA))
+            .GetSalesInvoicesAsync(new PagedRequest
+            {
+                Filters = new Dictionary<string, string?>
+                {
+                    ["invoiceDateFrom"] = "2026-01-02"
+                }
+            });
+        Assert(
+            DecodedQuery(fromHandler).Contains("$filter=postingDate ge 2026-01-02"),
+            "invoice from date uses inclusive server filter");
+
+        var toHandler = new QueueHandler(Json("{\"value\":[]}"));
+        await new SalesInvoicesService(CreateService(toHandler, CompanyA))
+            .GetSalesInvoicesAsync(new PagedRequest
+            {
+                Filters = new Dictionary<string, string?>
+                {
+                    ["invoiceDateTo"] = "2026-01-31"
+                }
+            });
+        Assert(
+            DecodedQuery(toHandler).Contains("$filter=postingDate le 2026-01-31"),
+            "invoice to date uses inclusive server filter");
+
+        var rangeHandler = new QueueHandler(Json("{\"value\":[]}"));
+        await new SalesInvoicesService(CreateService(rangeHandler, CompanyA))
+            .GetSalesInvoicesAsync(new PagedRequest
+            {
+                Filters = new Dictionary<string, string?>
+                {
+                    ["invoiceDateFrom"] = "2026-01-02",
+                    ["invoiceDateTo"] = "2026-01-31"
+                }
+            });
+        Assert(
+            DecodedQuery(rangeHandler).Contains(
+                "$filter=postingDate ge 2026-01-02 and postingDate le 2026-01-31"),
+            "invoice date range uses inclusive server filters");
+
+        var invalidHandler = new QueueHandler();
+        await AssertThrowsAsync<BadRequestException>(
+            () => new SalesInvoicesService(CreateService(invalidHandler, CompanyA))
+                .GetSalesInvoicesAsync(new PagedRequest
+                {
+                    Filters = new Dictionary<string, string?>
+                    {
+                        ["invoiceDateFrom"] = "01/02/2026"
+                    }
+                }),
+            "invalid invoice date format");
+        Assert(invalidHandler.Requests.Count == 0, "invalid invoice date is rejected before BC request");
     }
 
     private async Task CollectionEndpointsUseExactCustomSchemasAsync()

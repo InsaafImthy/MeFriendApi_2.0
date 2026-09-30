@@ -38,7 +38,7 @@ internal static class ODataQueryBuilder
                 throw new BadRequestException($"Filter field '{filter.Key}' is not supported.");
 
             if (!string.IsNullOrWhiteSpace(filter.Value))
-                filters.Add(EqualsValue(bcField, filter.Value.Trim()));
+                filters.Add(FilterValue(bcField, filter.Value.Trim()));
         }
 
         if (filters.Count > 0)
@@ -93,7 +93,7 @@ internal static class ODataQueryBuilder
         return string.Join('&', query);
     }
 
-    private static string EqualsValue(ODataFilterField field, string value)
+    private static string FilterValue(ODataFilterField field, string value)
     {
         var literal = field.ValueKind switch
         {
@@ -105,7 +105,15 @@ internal static class ODataQueryBuilder
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
 
-        return $"{field.BusinessCentralName} eq {literal}";
+        var filterOperator = field.Operator switch
+        {
+            ODataFilterOperator.Equal => "eq",
+            ODataFilterOperator.GreaterThanOrEqual => "ge",
+            ODataFilterOperator.LessThanOrEqual => "le",
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+
+        return $"{field.BusinessCentralName} {filterOperator} {literal}";
     }
 
     private static string EscapeStringLiteral(string value) =>
@@ -167,7 +175,15 @@ internal static class ODataQueryBuilder
 
 internal sealed record ODataFilterField(
     string BusinessCentralName,
-    ODataFilterValueKind ValueKind = ODataFilterValueKind.String);
+    ODataFilterValueKind ValueKind = ODataFilterValueKind.String,
+    ODataFilterOperator Operator = ODataFilterOperator.Equal);
+
+internal enum ODataFilterOperator
+{
+    Equal,
+    GreaterThanOrEqual,
+    LessThanOrEqual
+}
 
 internal enum ODataFilterValueKind
 {

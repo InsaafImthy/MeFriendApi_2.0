@@ -35,7 +35,19 @@ internal static class BusinessCentralListQueries
         ODataQueryBuilder.Build(request);
 
     internal static string SalesInvoices(PagedRequest request) =>
-        ODataQueryBuilder.Build(request);
+        ODataQueryBuilder.Build(
+            request,
+            filterFields: FilterMapWithTypes(
+                (
+                    "invoiceDateFrom",
+                    "postingDate",
+                    ODataFilterValueKind.Date,
+                    ODataFilterOperator.GreaterThanOrEqual),
+                (
+                    "invoiceDateTo",
+                    "postingDate",
+                    ODataFilterValueKind.Date,
+                    ODataFilterOperator.LessThanOrEqual)));
 
     internal static string Salespersons(PagedRequest request, bool lookup = false) =>
         ODataQueryBuilder.Build(
@@ -93,11 +105,16 @@ internal static class BusinessCentralListQueries
             StringComparer.OrdinalIgnoreCase);
 
     private static IReadOnlyDictionary<string, ODataFilterField> FilterMapWithTypes(
-        params (string PublicName, string BusinessCentralName, ODataFilterValueKind ValueKind)[] entries) =>
+        params (
+            string PublicName,
+            string BusinessCentralName,
+            ODataFilterValueKind ValueKind,
+            ODataFilterOperator Operator)[] entries) =>
         entries.ToDictionary(
             entry => entry.PublicName,
             entry => new ODataFilterField(
                 entry.BusinessCentralName,
-                entry.ValueKind),
+                entry.ValueKind,
+                entry.Operator),
             StringComparer.OrdinalIgnoreCase);
 }
