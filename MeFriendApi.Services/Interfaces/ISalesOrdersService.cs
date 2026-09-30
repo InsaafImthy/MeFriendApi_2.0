@@ -6,7 +6,7 @@ namespace MeFriendApi.Services.Interfaces
     {
         Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalesOrderDto>> GetSalesOrdersAsync(
             MeFriendApi.Domain.Dto.Paging.PagedRequest request);
-        Task<SalesOrderDto?> GetSalesOrderAsync(string id, string? salespersonCode = null);
+        Task<SalesOrderDto?> GetSalesOrderAsync(string id);
         Task<SalesOrderPostResponse?> CreateSalesOrderAsync(CreateSalesOrderRequest request);
     }
 }

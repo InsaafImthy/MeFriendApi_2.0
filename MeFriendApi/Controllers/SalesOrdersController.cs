@@ -24,10 +24,8 @@ namespace MeFriendApi.Controllers
             ExecuteAsync(() => _salesOrdersService.GetSalesOrdersAsync(request));
 
         [HttpGet("{id}")]
-        public Task<IActionResult> GetSalesOrder(
-            string id,
-            [FromQuery] string? salespersonCode = null) =>
-            ExecuteAsync(() => _salesOrdersService.GetSalesOrderAsync(id, salespersonCode));
+        public Task<IActionResult> GetSalesOrder(string id) =>
+            ExecuteAsync(() => _salesOrdersService.GetSalesOrderAsync(id));
 
         [HttpPost]
         public Task<IActionResult> CreateSalesOrder(CreateSalesOrderRequest request) =>

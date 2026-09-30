@@ -14,8 +14,8 @@ namespace MeFriendApi.Domain.Dto.Salespersons
         [JsonPropertyName("name")]
         public string? Name { get; set; }
 
-        [JsonPropertyName("phone")]
-        public string? Phone { get; set; }
+        [JsonPropertyName("phoneNo")]
+        public string? PhoneNo { get; set; }
 
         [JsonPropertyName("email")]
         public string? Email { get; set; }

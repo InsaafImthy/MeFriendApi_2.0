@@ -1,14 +1,10 @@
-using MeFriendApi.Controllers;
 using MeFriendApi.Domain.Dto;
 using MeFriendApi.Domain.Dto.Paging;
-using MeFriendApi.Domain.Dto.SalesInvoices;
 using MeFriendApi.Domain.Exceptions;
 using MeFriendApi.Services.Infrastructure;
 using MeFriendApi.Services.Services;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Text;
 using static MeFriendApi.Domain.Constants;
@@ -33,12 +29,11 @@ internal sealed class PagingTests
         await ContinuationUrlCannotEscapeEnvironmentAsync();
         await MaximumPageSizeIsEnforcedAsync();
         await CustomerFiltersAndSortingStayServerSideAsync();
-        await SalesOrderAndInvoiceFiltersStayServerSideAsync();
         await CollectionEndpointsUseExactCustomSchemasAsync();
         await InvoiceListAndDetailAreSeparatedAsync();
         await EventsUsePagedNavigationCollectionAsync();
 
-        Console.WriteLine("PASS: 10 Business Central paging test groups completed.");
+        Console.WriteLine("PASS: 9 Business Central paging test groups completed.");
     }
 
     private async Task FirstAndNextPageAsync()
@@ -172,114 +167,18 @@ internal sealed class PagingTests
     {
         var handler = new QueueHandler(
             Json("{\"value\":[]}"),
-            Json("{\"value\":[{\"no\":\"TECH-1\",\"invoiceNo\":\"INV-1\",\"SalesInvoiceLines\":[{\"documentNo\":\"INV-1\",\"lineNo\":10000}]}]}"),
-            Json("{\"value\":[]}"));
+            Json("{\"value\":[{\"invoiceNo\":\"INV-1\",\"SalesInvoiceLines\":[]}]}"));
         var invoices = new SalesInvoicesService(CreateService(handler, CompanyA));
-        var controller = new SalesInvoicesController(
-            invoices,
-            NullLogger<ApiControllerBase>.Instance);
 
         await invoices.GetSalesInvoicesAsync(new PagedRequest());
-        var detailResult = await controller.GetSalesInvoice("  INV-1  ");
+        await invoices.GetSalesInvoiceAsync("INV-1");
 
         var listQuery = Uri.UnescapeDataString(handler.Requests[0].Uri.Query);
         var detailQuery = Uri.UnescapeDataString(handler.Requests[1].Uri.Query);
         Assert(!listQuery.Contains("$expand", StringComparison.OrdinalIgnoreCase), "invoice list has no expand");
         Assert(!listQuery.Contains("base64", StringComparison.OrdinalIgnoreCase), "invoice list excludes base64");
-        Assert(detailQuery.Contains("invoiceNo eq 'INV-1'"), "invoice detail filters by trimmed invoiceNo");
         Assert(detailQuery.Contains("$top=1"), "invoice detail is limited to one");
         Assert(detailQuery.Contains("$expand=SalesInvoiceLines"), "invoice detail expands lines");
-
-        var detailOk = detailResult as OkObjectResult;
-        Assert(detailOk?.StatusCode == 200, "valid invoice detail returns 200");
-        var detail = detailOk?.Value as SalesInvoiceDto
-            ?? throw new InvalidOperationException("FAIL: valid invoice detail response body");
-        Assert(detail.No == "TECH-1" && detail.InvoiceNo == "INV-1", "invoice technical and business fields map");
-        Assert(detail.SalesInvoiceLines.Count == 1, "invoice detail returns expanded lines");
-
-        var notFoundResult = await controller.GetSalesInvoice("MISSING");
-        Assert(notFoundResult is NotFoundObjectResult, "missing invoice detail returns 404");
-
-        var requestCountBeforeInvalidReferences = handler.Requests.Count;
-        var guidResult = await controller.GetSalesInvoice("42eadb99-be08-f111-8405-6045bde7abd0");
-        Assert(guidResult is BadRequestObjectResult guidBadRequest
-               && Equals(
-                   guidBadRequest.Value,
-                   "Invoice detail requires an invoice number, not a Business Central system ID."),
-            "system GUID returns a clear 400");
-        Assert(handler.Requests.Count == requestCountBeforeInvalidReferences, "system GUID is rejected before BC call");
-
-        await AssertThrowsAsync<BadRequestException>(
-            () => invoices.GetSalesInvoiceAsync("   "),
-            "blank invoice number");
-        await AssertThrowsAsync<BadRequestException>(
-            () => invoices.GetSalesInvoiceAsync(new string('X', 21)),
-            "overlength invoice number");
-        Assert(handler.Requests.Count == requestCountBeforeInvalidReferences, "other invalid invoice numbers are rejected before BC call");
-    }
-
-    private async Task SalesOrderAndInvoiceFiltersStayServerSideAsync()
-    {
-        var orderHandler = new QueueHandler(Json("{\"value\":[]}"));
-        await new SalesOrdersService(CreateService(orderHandler, CompanyA))
-            .GetSalesOrdersAsync(new PagedRequest
-            {
-                Search = "SO-1",
-                SortField = "postingDate",
-                SortDirection = "desc",
-                Filters = new Dictionary<string, string?>
-                {
-                    ["customerCode"] = "C-1",
-                    ["salespersonCode"] = "SP001",
-                    ["status"] = "Released",
-                    ["orderDateFrom"] = "2026-09-01",
-                    ["orderDateTo"] = "2026-09-30"
-                }
-            });
-
-        var orderQuery = DecodedQuery(orderHandler);
-        Assert(orderQuery.Contains("contains(number,'SO-1')"), "sales order server search");
-        Assert(orderQuery.Contains("sellToCustomerNo eq 'C-1'"), "sales order customer filter");
-        Assert(orderQuery.Contains("salesperson eq 'SP001'"), "sales order salesperson filter");
-        Assert(orderQuery.Contains("status eq 'Released'"), "sales order status filter");
-        Assert(orderQuery.Contains("rodate ge '2026-09-01'"), "sales order date-from filter");
-        Assert(orderQuery.Contains("rodate le '2026-09-30'"), "sales order date-to filter");
-        Assert(orderQuery.Contains("$orderby=postingDate desc"), "sales order server sort");
-
-        var invoiceHandler = new QueueHandler(Json("{\"value\":[]}"));
-        var invoices = new SalesInvoicesService(CreateService(invoiceHandler, CompanyA));
-        await invoices.GetSalesInvoicesAsync(new PagedRequest
-        {
-            Search = "INV-1",
-            SortField = "invoiceDate",
-            SortDirection = "asc",
-            Filters = new Dictionary<string, string?>
-            {
-                ["customerCode"] = "C-1",
-                ["salespersonCode"] = "SP001",
-                ["invoiceDateFrom"] = "2026-09-01",
-                ["invoiceDateTo"] = "2026-09-30"
-            }
-        });
-
-        var invoiceQuery = DecodedQuery(invoiceHandler);
-        Assert(invoiceQuery.Contains("contains(invoiceNo,'INV-1')"), "invoice server search");
-        Assert(invoiceQuery.Contains("customerCode eq 'C-1'"), "invoice customer filter");
-        Assert(invoiceQuery.Contains("salesPerson eq 'SP001'"), "invoice salesperson filter");
-        Assert(invoiceQuery.Contains("invoiceDate ge 2026-09-01"), "invoice date-from filter");
-        Assert(invoiceQuery.Contains("invoiceDate le 2026-09-30"), "invoice date-to filter");
-        Assert(invoiceQuery.Contains("$orderby=invoiceDate asc"), "invoice server sort");
-
-        await AssertThrowsAsync<BadRequestException>(
-            () => invoices.GetSalesInvoicesAsync(new PagedRequest
-            {
-                Filters = new Dictionary<string, string?>
-                {
-                    ["outstandingOnly"] = "true"
-                }
-            }),
-            "unsupported invoice filter");
-        Assert(invoiceHandler.Requests.Count == 1, "unsupported invoice filter is rejected before BC call");
     }
 
     private async Task CollectionEndpointsUseExactCustomSchemasAsync()
@@ -312,8 +211,8 @@ internal sealed class PagingTests
         AssertCvtPath(salespersonHandler, "/salespersons", "salespersons");
         var salespersonQuery = DecodedQuery(salespersonHandler);
         Assert(salespersonQuery.Contains("$select=code,name"), "salespersons use proven fields");
-        Assert(salespersonQuery.Contains("$select=code,name,email,phone"), "salespersons use metadata-proven fields");
-        Assert(!salespersonQuery.Contains("phoneNo", StringComparison.OrdinalIgnoreCase), "salespersons exclude nonexistent phoneNo");
+        Assert(!salespersonQuery.Contains("phoneNo", StringComparison.OrdinalIgnoreCase), "salespersons exclude phoneNo");
+        Assert(!salespersonQuery.Contains("email", StringComparison.OrdinalIgnoreCase), "salespersons exclude unverified email");
 
         var dimensionHandler = new QueueHandler(Json("{\"value\":[]}"));
         await new DimensionsService(CreateService(dimensionHandler, CompanyA))

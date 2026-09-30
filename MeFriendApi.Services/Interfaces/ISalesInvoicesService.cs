@@ -6,6 +6,6 @@ namespace MeFriendApi.Services.Interfaces
     {
         Task<MeFriendApi.Domain.Dto.Paging.PagedResult<SalesInvoiceDto>> GetSalesInvoicesAsync(
             MeFriendApi.Domain.Dto.Paging.PagedRequest request);
-        Task<SalesInvoiceDto?> GetSalesInvoiceAsync(string invoiceNumber, string? salespersonCode = null);
+        Task<SalesInvoiceDto?> GetSalesInvoiceAsync(string id);
     }
 }
