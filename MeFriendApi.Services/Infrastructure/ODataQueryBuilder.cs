@@ -38,7 +38,7 @@ internal static class ODataQueryBuilder
                 throw new BadRequestException($"Filter field '{filter.Key}' is not supported.");
 
             if (!string.IsNullOrWhiteSpace(filter.Value))
-                filters.Add(EqualsValue(bcField, filter.Value.Trim()));
+                filters.Add(BuildFilterExpression(bcField, filter.Value.Trim()));
         }
 
         if (filters.Count > 0)
@@ -69,7 +69,9 @@ internal static class ODataQueryBuilder
         string value,
         bool isGuid = false,
         string? select = null,
-        string? expand = null)
+        string? expand = null,
+        string? scopeField = null,
+        string? scopeValue = null)
     {
         if (string.IsNullOrWhiteSpace(value))
             throw new BadRequestException("A record identifier is required.");
@@ -78,9 +80,17 @@ internal static class ODataQueryBuilder
             ? ParseGuid(value).ToString("D")
             : $"'{EscapeStringLiteral(value.Trim())}'";
 
+        var filterExpressions = new List<string> { $"{field} eq {literal}" };
+
+        if (!string.IsNullOrWhiteSpace(scopeField) && !string.IsNullOrWhiteSpace(scopeValue))
+        {
+            filterExpressions.Add(
+                $"{scopeField.Trim()} eq '{EscapeStringLiteral(scopeValue.Trim())}'");
+        }
+
         var query = new List<string>
         {
-            $"$filter={Uri.EscapeDataString($"{field} eq {literal}")}",
+            $"$filter={Uri.EscapeDataString(string.Join(" and ", filterExpressions))}",
             "$top=1"
         };
 
@@ -93,7 +103,7 @@ internal static class ODataQueryBuilder
         return string.Join('&', query);
     }
 
-    private static string EqualsValue(ODataFilterField field, string value)
+    private static string BuildFilterExpression(ODataFilterField field, string value)
     {
         var literal = field.ValueKind switch
         {
@@ -105,8 +115,18 @@ internal static class ODataQueryBuilder
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
 
-        return $"{field.BusinessCentralName} eq {literal}";
+        return $"{field.BusinessCentralName} {OperatorToken(field.Operator)} {literal}";
     }
+
+    private static string OperatorToken(ODataFilterOperator filterOperator) => filterOperator switch
+    {
+        ODataFilterOperator.Eq => "eq",
+        ODataFilterOperator.Ge => "ge",
+        ODataFilterOperator.Le => "le",
+        ODataFilterOperator.Gt => "gt",
+        ODataFilterOperator.Lt => "lt",
+        _ => throw new ArgumentOutOfRangeException(nameof(filterOperator))
+    };
 
     private static string EscapeStringLiteral(string value) =>
         value.Replace("'", "''", StringComparison.Ordinal);
@@ -167,7 +187,17 @@ internal static class ODataQueryBuilder
 
 internal sealed record ODataFilterField(
     string BusinessCentralName,
-    ODataFilterValueKind ValueKind = ODataFilterValueKind.String);
+    ODataFilterValueKind ValueKind = ODataFilterValueKind.String,
+    ODataFilterOperator Operator = ODataFilterOperator.Eq);
+
+internal enum ODataFilterOperator
+{
+    Eq,
+    Ge,
+    Le,
+    Gt,
+    Lt
+}
 
 internal enum ODataFilterValueKind
 {

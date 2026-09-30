@@ -22,8 +22,19 @@ namespace MeFriendApi.Controllers
             [FromQuery] MeFriendApi.Domain.Dto.Paging.PagedRequest request) =>
             ExecuteAsync(() => _salesInvoicesService.GetSalesInvoicesAsync(request));
 
-        [HttpGet("{id}")]
-        public Task<IActionResult> GetSalesInvoice(string id) =>
-            ExecuteAsync(() => _salesInvoicesService.GetSalesInvoiceAsync(id));
+        [HttpGet("{invoiceNumber}")]
+        public Task<IActionResult> GetSalesInvoice(
+            string invoiceNumber,
+            [FromQuery] string? salespersonCode = null) =>
+            ExecuteAsync(async () =>
+            {
+                var invoice = await _salesInvoicesService.GetSalesInvoiceAsync(
+                    invoiceNumber,
+                    salespersonCode);
+
+                return invoice == null
+                    ? NotFound($"Sales invoice '{invoiceNumber.Trim()}' was not found.")
+                    : Ok(invoice);
+            });
     }
 }

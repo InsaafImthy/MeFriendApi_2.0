@@ -21,6 +21,7 @@ namespace MeFriendApi.Services
             services.AddTransient<UserAuthMiddleware>();
             services.AddScoped<IBusinessCentralCompanyContext, BusinessCentralCompanyContext>();
             services.AddSingleton<IBusinessCentralContinuationTokenService, BusinessCentralContinuationTokenService>();
+            services.AddSingleton<IHtmlPdfService, PlaywrightHtmlPdfService>();
             services.AddScoped<ID365CommonService, D365CommonService>();
             services.AddScoped<ICustomersService, CustomersService>();
             services.AddScoped<IItemMastersService, ItemMastersService>();

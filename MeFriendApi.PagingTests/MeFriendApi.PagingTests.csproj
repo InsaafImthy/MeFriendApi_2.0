@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\MeFriendApi\MeFriendApi.csproj" />
     <ProjectReference Include="..\MeFriendApi.Domain\MeFriendApi.Domain.csproj" />
     <ProjectReference Include="..\MeFriendApi.Services\MeFriendApi.Services.csproj" />
   </ItemGroup>
