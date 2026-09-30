@@ -12,14 +12,19 @@ internal static class BusinessCentralListQueries
                 : [
                     "id", "number", "name", "name2", "city", "stateCode",
                     "countryRegionCode", "phoneNumber", "gstRegistrationNo",
-                    "locationCode", "createdDateTime", "modifiedDateTime"
+                    "locationCode", "gstCustomerType", "createdDateTime", "modifiedDateTime"
                 ],
             ["number", "name", "phoneNumber"],
             Map(
                 ("number", "number"),
+                ("customerCode", "number"),
                 ("customerName", "name"),
                 ("name", "name"),
                 ("city", "city"),
+                ("stateCode", "stateCode"),
+                ("countryCode", "countryRegionCode"),
+                ("phoneNumber", "phoneNumber"),
+                ("gstCustomerType", "gstCustomerType"),
                 ("createdDateTime", "createdDateTime"),
                 ("modifiedDateTime", "modifiedDateTime")),
             FilterMap(
@@ -32,29 +37,75 @@ internal static class BusinessCentralListQueries
             "number");
 
     internal static string SalesOrders(PagedRequest request) =>
-        ODataQueryBuilder.Build(request);
+        ODataQueryBuilder.Build(
+            request,
+            searchFields: ["number", "sellToCustomerNo", "billToCustomerNo", "roNo"],
+            sortFields: Map(
+                ("salesOrderNumber", "number"),
+                ("customerName", "sellToCustomerName"),
+                ("clientName", "clientName"),
+                ("orderDate", "rodate"),
+                ("postingDate", "postingDate"),
+                ("status", "status"),
+                ("totalAmount", "amount"),
+                ("invoiceDiscountAmountExclVat", "invoiceDiscountAmountExclVat"),
+                ("amountIncludingVAT", "amountIncludingVAT")),
+            filterFields: FilterMapWithTypes(
+                ("customerCode", "sellToCustomerNo", ODataFilterValueKind.String, ODataFilterOperator.Equal),
+                ("salespersonCode", "salesperson", ODataFilterValueKind.String, ODataFilterOperator.Equal),
+                ("status", "status", ODataFilterValueKind.String, ODataFilterOperator.Equal),
+                ("orderDateFrom", "rodate", ODataFilterValueKind.Date, ODataFilterOperator.GreaterThanOrEqual),
+                ("orderDateTo", "rodate", ODataFilterValueKind.Date, ODataFilterOperator.LessThanOrEqual)));
 
     internal static string SalesInvoices(PagedRequest request) =>
         ODataQueryBuilder.Build(
             request,
+            searchFields: [
+                "invoiceNo", "sellToCustomerNo", "sellToCustomerName",
+                "salesOrderNo", "paymentStatus", "status"
+            ],
+            sortFields: Map(
+                ("invoiceNumber", "invoiceNo"),
+                ("customerName", "sellToCustomerName"),
+                ("salesOrderNumber", "salesOrderNo"),
+                ("invoiceDate", "invoiceDate"),
+                ("dueDate", "dueDate"),
+                ("totalAmount", "totalAmount"),
+                ("paidAmount", "paidAmount"),
+                ("outstandingAmount", "outstandingAmount"),
+                ("paymentStatus", "paymentStatus"),
+                ("invoiceStatus", "status")),
             filterFields: FilterMapWithTypes(
+                ("customerCode", "sellToCustomerNo", ODataFilterValueKind.String, ODataFilterOperator.Equal),
+                ("salesOrderNumber", "salesOrderNo", ODataFilterValueKind.String, ODataFilterOperator.Equal),
+                ("invoiceStatus", "status", ODataFilterValueKind.String, ODataFilterOperator.Equal),
+                ("paymentStatus", "paymentStatus", ODataFilterValueKind.String, ODataFilterOperator.Equal),
                 (
                     "invoiceDateFrom",
-                    "postingDate",
+                    "invoiceDate",
                     ODataFilterValueKind.Date,
                     ODataFilterOperator.GreaterThanOrEqual),
                 (
                     "invoiceDateTo",
-                    "postingDate",
+                    "invoiceDate",
                     ODataFilterValueKind.Date,
-                    ODataFilterOperator.LessThanOrEqual)));
+                    ODataFilterOperator.LessThanOrEqual),
+                ("dueDateFrom", "dueDate", ODataFilterValueKind.Date, ODataFilterOperator.GreaterThanOrEqual),
+                ("dueDateTo", "dueDate", ODataFilterValueKind.Date, ODataFilterOperator.LessThanOrEqual),
+                ("outstandingOnly", "outstandingAmount", ODataFilterValueKind.PositiveDecimalWhenTrue, ODataFilterOperator.GreaterThan)));
 
     internal static string Salespersons(PagedRequest request, bool lookup = false) =>
         ODataQueryBuilder.Build(
             request,
-            ["code", "name"],
-            ["code", "name"],
-            Map(("code", "code"), ("name", "name")),
+            lookup ? ["code", "name"] : ["code", "name", "email", "phone"],
+            lookup ? ["code", "name"] : ["code", "name", "email", "phone"],
+            Map(
+                ("code", "code"),
+                ("salespersonCode", "code"),
+                ("name", "name"),
+                ("salespersonName", "name"),
+                ("email", "email"),
+                ("phoneNumber", "phone")),
             FilterMap(("code", "code")),
             "code");
 
@@ -86,7 +137,11 @@ internal static class BusinessCentralListQueries
             request,
             null,
             ["code", "name"],
-            Map(("code", "code"), ("name", "name")),
+            Map(
+                ("code", "code"),
+                ("eventCode", "code"),
+                ("name", "name"),
+                ("eventName", "name")),
             FilterMap(("code", "code")),
             "code");
 

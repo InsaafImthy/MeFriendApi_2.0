@@ -26,8 +26,14 @@ namespace MeFriendApi.Domain.Dto.SalesInvoices
         [JsonPropertyName("salesOrderNo")]
         public string? SalesOrderNo { get; set; }
 
+        [JsonPropertyName("salesPerson")]
+        public string? SalespersonCode { get; set; }
+
         [JsonPropertyName("postingDate")]
         public string? PostingDate { get; set; }
+
+        [JsonPropertyName("invoiceDate")]
+        public string? InvoiceDate { get; set; }
 
         [JsonPropertyName("dueDate")]
         public string? DueDate { get; set; }

@@ -28,12 +28,14 @@ namespace MeFriendApi.Services.Services
                 "Error retrieving sales orders");
         }
 
-        public async Task<SalesOrderDto?> GetSalesOrderAsync(string id)
+        public async Task<SalesOrderDto?> GetSalesOrderAsync(string id, string? salespersonCode = null)
         {
             var query = ODataQueryBuilder.BuildSingleFilter(
                 "number",
                 id,
-                expand: "SalesOrderLines");
+                expand: "SalesOrderLines",
+                scopeField: "salesperson",
+                scopeValue: salespersonCode);
 
             return await ServiceOperationExecutor.ExecuteAsync(
                 () => _d365CommonService.GetSingleDataFromBc<SalesOrderDto>(

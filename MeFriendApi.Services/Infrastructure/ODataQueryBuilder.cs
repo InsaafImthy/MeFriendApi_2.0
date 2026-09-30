@@ -38,7 +38,11 @@ internal static class ODataQueryBuilder
                 throw new BadRequestException($"Filter field '{filter.Key}' is not supported.");
 
             if (!string.IsNullOrWhiteSpace(filter.Value))
-                filters.Add(FilterValue(bcField, filter.Value.Trim()));
+            {
+                var expression = FilterValue(bcField, filter.Value.Trim());
+                if (!string.IsNullOrWhiteSpace(expression))
+                    filters.Add(expression);
+            }
         }
 
         if (filters.Count > 0)
@@ -69,7 +73,9 @@ internal static class ODataQueryBuilder
         string value,
         bool isGuid = false,
         string? select = null,
-        string? expand = null)
+        string? expand = null,
+        string? scopeField = null,
+        string? scopeValue = null)
     {
         if (string.IsNullOrWhiteSpace(value))
             throw new BadRequestException("A record identifier is required.");
@@ -78,9 +84,17 @@ internal static class ODataQueryBuilder
             ? ParseGuid(value).ToString("D")
             : $"'{EscapeStringLiteral(value.Trim())}'";
 
+        var filterExpressions = new List<string> { $"{field} eq {literal}" };
+
+        if (!string.IsNullOrWhiteSpace(scopeField) && !string.IsNullOrWhiteSpace(scopeValue))
+        {
+            filterExpressions.Add(
+                $"{scopeField.Trim()} eq '{EscapeStringLiteral(scopeValue.Trim())}'");
+        }
+
         var query = new List<string>
         {
-            $"$filter={Uri.EscapeDataString($"{field} eq {literal}")}",
+            $"$filter={Uri.EscapeDataString(string.Join(" and ", filterExpressions))}",
             "$top=1"
         };
 
@@ -93,8 +107,15 @@ internal static class ODataQueryBuilder
         return string.Join('&', query);
     }
 
-    private static string FilterValue(ODataFilterField field, string value)
+    private static string? FilterValue(ODataFilterField field, string value)
     {
+        if (field.ValueKind == ODataFilterValueKind.PositiveDecimalWhenTrue)
+        {
+            return ParseBooleanValue(value)
+                ? $"{field.BusinessCentralName} gt 0"
+                : null;
+        }
+
         var literal = field.ValueKind switch
         {
             ODataFilterValueKind.String => $"'{EscapeStringLiteral(value)}'",
@@ -110,6 +131,7 @@ internal static class ODataQueryBuilder
             ODataFilterOperator.Equal => "eq",
             ODataFilterOperator.GreaterThanOrEqual => "ge",
             ODataFilterOperator.LessThanOrEqual => "le",
+            ODataFilterOperator.GreaterThan => "gt",
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
 
@@ -144,10 +166,15 @@ internal static class ODataQueryBuilder
 
     private static string ParseBoolean(string value)
     {
+        return ParseBooleanValue(value) ? "true" : "false";
+    }
+
+    private static bool ParseBooleanValue(string value)
+    {
         if (!bool.TryParse(value, out var result))
             throw new BadRequestException("Boolean filters must be true or false.");
 
-        return result ? "true" : "false";
+        return result;
     }
 
     private static string ParseDecimal(string value)
@@ -182,7 +209,8 @@ internal enum ODataFilterOperator
 {
     Equal,
     GreaterThanOrEqual,
-    LessThanOrEqual
+    LessThanOrEqual,
+    GreaterThan
 }
 
 internal enum ODataFilterValueKind
@@ -191,5 +219,6 @@ internal enum ODataFilterValueKind
     Date,
     Guid,
     Boolean,
-    Decimal
+    Decimal,
+    PositiveDecimalWhenTrue
 }

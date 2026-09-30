@@ -37,11 +37,26 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("clientName")]
         public string? ClientName { get; set; }
 
+        [JsonPropertyName("salesperson")]
+        public string? SalespersonCode { get; set; }
+
         [JsonPropertyName("postingDate")]
         public string? PostingDate { get; set; }
 
         [JsonPropertyName("orderDate")]
         public string? OrderDate { get; set; }
+
+        [JsonPropertyName("rodate")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? BusinessCentralOrderDate
+        {
+            get => null;
+            set
+            {
+                if (string.IsNullOrWhiteSpace(OrderDate))
+                    OrderDate = value;
+            }
+        }
 
         [JsonPropertyName("status")]
         public string? Status { get; set; }
