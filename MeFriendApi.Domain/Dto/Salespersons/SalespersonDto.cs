@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MeFriendApi.Domain.Dto.Salespersons
@@ -20,7 +19,7 @@ namespace MeFriendApi.Domain.Dto.Salespersons
         [JsonPropertyName("email")]
         public string? Email { get; set; }
 
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
+        [JsonPropertyName("mdmCode")]
+        public string? MdmCode { get; set; }
     }
 }

@@ -38,7 +38,7 @@ namespace MeFriendApi.Services.Services
             var query = ODataQueryBuilder.BuildSingleFilter(
                 "invoiceNo",
                 normalizedInvoiceNumber,
-                expand: "SalesInvoiceLines",
+                expand: "salesInvoiceLines",
                 scopeField: "salesPerson",
                 scopeValue: salespersonCode);
 

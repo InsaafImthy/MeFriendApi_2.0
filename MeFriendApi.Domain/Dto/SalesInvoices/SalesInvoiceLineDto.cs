@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MeFriendApi.Domain.Dto.SalesInvoices
@@ -14,28 +13,19 @@ namespace MeFriendApi.Domain.Dto.SalesInvoices
         [JsonPropertyName("lineNo")]
         public int? LineNo { get; set; }
 
-        [JsonPropertyName("type")]
-        public string? Type { get; set; }
-
-        [JsonPropertyName("no")]
-        public string? No { get; set; }
-
-        [JsonPropertyName("description")]
-        public string? Description { get; set; }
+        [JsonPropertyName("itemNo")]
+        public string? ItemNo { get; set; }
 
         [JsonPropertyName("quantity")]
         public decimal? Quantity { get; set; }
 
-        [JsonPropertyName("unitPrice")]
-        public decimal? UnitPrice { get; set; }
+        [JsonPropertyName("HSNCode")]
+        public string? HsnCode { get; set; }
 
-        [JsonPropertyName("lineAmount")]
-        public decimal? LineAmount { get; set; }
+        [JsonPropertyName("GSTRate")]
+        public string? GstRate { get; set; }
 
-        [JsonPropertyName("amountIncludingVAT")]
-        public decimal? AmountIncludingVAT { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
+        [JsonPropertyName("Amount")]
+        public decimal? Amount { get; set; }
     }
 }

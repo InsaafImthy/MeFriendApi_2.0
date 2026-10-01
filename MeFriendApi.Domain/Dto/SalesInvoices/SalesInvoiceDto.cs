@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MeFriendApi.Domain.Dto.SalesInvoices
@@ -8,55 +7,59 @@ namespace MeFriendApi.Domain.Dto.SalesInvoices
         [JsonPropertyName("@odata.etag")]
         public string? ODataEtag { get; set; }
 
-        [JsonPropertyName("base64")]
-        public string? Base64 { get; set; }
 
-        [JsonPropertyName("no")]
-        public string? No { get; set; }
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
 
         [JsonPropertyName("invoiceNo")]
         public string? InvoiceNo { get; set; }
 
-        [JsonPropertyName("sellToCustomerNo")]
-        public string? SellToCustomerNo { get; set; }
-
-        [JsonPropertyName("sellToCustomerName")]
-        public string? SellToCustomerName { get; set; }
-
-        [JsonPropertyName("salesOrderNo")]
-        public string? SalesOrderNo { get; set; }
-
-        [JsonPropertyName("salesPerson")]
-        public string? SalespersonCode { get; set; }
-
-        [JsonPropertyName("postingDate")]
-        public string? PostingDate { get; set; }
-
         [JsonPropertyName("invoiceDate")]
         public string? InvoiceDate { get; set; }
 
-        [JsonPropertyName("dueDate")]
-        public string? DueDate { get; set; }
+        [JsonPropertyName("customerCode")]
+        public string? CustomerCode { get; set; }
 
-        [JsonPropertyName("totalAmount")]
-        public decimal? TotalAmount { get; set; }
+        [JsonPropertyName("customerName")]
+        public string? CustomerName { get; set; }
 
-        [JsonPropertyName("paidAmount")]
-        public decimal? PaidAmount { get; set; }
+        [JsonPropertyName("customerAddress")]
+        public string? CustomerAddress { get; set; }
 
-        [JsonPropertyName("outstandingAmount")]
-        public decimal? OutstandingAmount { get; set; }
+        [JsonPropertyName("customerGSTNo")]
+        public string? CustomerGSTNo { get; set; }
 
-        [JsonPropertyName("paymentStatus")]
-        public string? PaymentStatus { get; set; }
+        [JsonPropertyName("clientCode")]
+        public string? ClientCode { get; set; }
 
-        [JsonPropertyName("status")]
-        public string? Status { get; set; }
+        [JsonPropertyName("clientName")]
+        public string? ClientName { get; set; }
 
-        [JsonPropertyName("SalesInvoiceLines")]
+        [JsonPropertyName("clientAddress")]
+        public string? ClientAddress { get; set; }
+
+        [JsonPropertyName("clientGSTNo")]
+        public string? ClientGSTNo { get; set; }
+
+        [JsonPropertyName("salesPerson")]
+        public string? SalesPerson { get; set; }
+
+        [JsonPropertyName("tradeDiscount")]
+        public decimal? TradeDiscount { get; set; }
+
+        [JsonPropertyName("sgst")]
+        public decimal? Sgst { get; set; }
+
+        [JsonPropertyName("cgst")]
+        public decimal? Cgst { get; set; }
+
+        [JsonPropertyName("igst")]
+        public decimal? Igst { get; set; }
+
+        [JsonPropertyName("netAmount")]
+        public decimal? NetAmount { get; set; }
+
+        [JsonPropertyName("salesInvoiceLines")]
         public List<SalesInvoiceLineDto> SalesInvoiceLines { get; set; } = new();
-
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
     }
 }

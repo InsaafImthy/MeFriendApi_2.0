@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MeFriendApi.Domain.Dto.SalesOrders
@@ -8,11 +7,14 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("@odata.etag")]
         public string? ODataEtag { get; set; }
 
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
         [JsonPropertyName("documentNo")]
         public string? DocumentNo { get; set; }
 
-        [JsonPropertyName("lineNo")]
-        public int? LineNo { get; set; }
+        [JsonPropertyName("sequence")]
+        public int? Sequence { get; set; }
 
         [JsonPropertyName("type")]
         public string? Type { get; set; }
@@ -20,25 +22,19 @@ namespace MeFriendApi.Domain.Dto.SalesOrders
         [JsonPropertyName("no")]
         public string? No { get; set; }
 
-        [JsonPropertyName("description")]
-        public string? Description { get; set; }
-
         [JsonPropertyName("quantity")]
         public decimal? Quantity { get; set; }
 
-        [JsonPropertyName("unitPrice")]
-        public decimal? UnitPrice { get; set; }
+        [JsonPropertyName("rate")]
+        public decimal? Rate { get; set; }
 
-        [JsonPropertyName("unitpriceexclTax")]
-        public decimal? UnitPriceExclTax { get; set; }
+        [JsonPropertyName("lineDiscountPercentage")]
+        public decimal? LineDiscountPercentage { get; set; }
 
-        [JsonPropertyName("lineAmount")]
-        public decimal? LineAmount { get; set; }
+        [JsonPropertyName("lineAmountExclVat")]
+        public decimal? LineAmountExclVat { get; set; }
 
-        [JsonPropertyName("amountIncludingVAT")]
-        public decimal? AmountIncludingVAT { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
+        [JsonPropertyName("invoiceDiscountAmountExclVat")]
+        public decimal? InvoiceDiscountAmountExclVat { get; set; }
     }
 }

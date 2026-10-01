@@ -175,24 +175,33 @@ internal sealed class PagingTests
 
         await customers.GetCustomers(new PagedRequest
         {
-            Search = "O'Reilly",
+            Search = "C-001",
             SortField = "customerCode",
             SortDirection = "desc",
             Filters = new Dictionary<string, string?>
             {
                 ["city"] = "Mumbai",
-                ["stateCode"] = "MH",
                 ["gstCustomerType"] = "Registered"
             }
         });
 
         var query = Uri.UnescapeDataString(handler.Requests.Single().Uri.Query);
-        Assert(query.Contains("contains(name,'O''Reilly')"), "escaped server search");
+        Assert(query.Contains("contains(number,'C-001')"), "customer search uses one metadata-proven field");
+        Assert(!query.Contains(" or ", StringComparison.OrdinalIgnoreCase), "customer search avoids unsupported cross-field OR");
         Assert(query.Contains("city eq 'Mumbai'"), "allowlisted server filter");
-        Assert(query.Contains("stateCode eq 'MH'"), "customer state filter");
         Assert(query.Contains("gstCustomerType eq 'Registered'"), "customer GST filter");
         Assert(query.Contains("$orderby=number desc"), "customerCode sort alias");
-        Assert(query.Contains("$select=id,number,name"), "customer list select");
+        Assert(query.Contains("$select=id,number,name,name2,address,address2"), "customer list uses metadata-proven fields");
+
+        var stateHandler = new QueueHandler();
+        await AssertThrowsAsync<BadRequestException>(
+            () => new CustomersService(CreateService(stateHandler, CompanyA))
+                .GetCustomers(new PagedRequest
+                {
+                    Filters = new Dictionary<string, string?> { ["stateCode"] = "MH" }
+                }),
+            "unsupported customer state filter");
+        Assert(stateHandler.Requests.Count == 0, "unsupported customer state filter rejected before BC request");
     }
 
     private async Task SalesOrderFiltersAndSortingStayServerSideAsync()
@@ -202,15 +211,13 @@ internal sealed class PagingTests
             .GetSalesOrdersAsync(new PagedRequest
             {
                 Search = "SO-1",
-                SortField = "postingDate",
+                SortField = "status",
                 SortDirection = "desc",
                 Filters = new Dictionary<string, string?>
                 {
                     ["customerCode"] = "C-1",
                     ["salespersonCode"] = "SP001",
-                    ["status"] = "Released",
-                    ["orderDateFrom"] = "2026-09-01",
-                    ["orderDateTo"] = "2026-09-30"
+                    ["status"] = "Released"
                 }
             });
 
@@ -219,16 +226,41 @@ internal sealed class PagingTests
         Assert(query.Contains("sellToCustomerNo eq 'C-1'"), "sales order customer filter");
         Assert(query.Contains("salesperson eq 'SP001'"), "sales order salesperson filter");
         Assert(query.Contains("status eq 'Released'"), "sales order status filter");
-        Assert(query.Contains("rodate ge 2026-09-01"), "sales order inclusive date-from filter");
-        Assert(query.Contains("rodate le 2026-09-30"), "sales order inclusive date-to filter");
-        Assert(query.Contains("$orderby=postingDate desc"), "sales order server sort");
+        Assert(query.Contains("$orderby=status desc"), "sales order server sort");
+
+        foreach (var unsupportedFilter in new[] { "orderDateFrom", "orderDateTo" })
+        {
+            var unsupportedHandler = new QueueHandler();
+            await AssertThrowsAsync<BadRequestException>(
+                () => new SalesOrdersService(CreateService(unsupportedHandler, CompanyA))
+                    .GetSalesOrdersAsync(new PagedRequest
+                    {
+                        Filters = new Dictionary<string, string?> { [unsupportedFilter] = "2026-09-01" }
+                    }),
+                $"unsupported sales order filter {unsupportedFilter}");
+            Assert(unsupportedHandler.Requests.Count == 0, $"unsupported sales order filter {unsupportedFilter} rejected before BC request");
+        }
+
+        foreach (var unsupportedSort in new[]
+        {
+            "customerName", "clientName", "orderDate", "postingDate", "totalAmount",
+            "invoiceDiscountAmountExclVat", "amountIncludingVAT"
+        })
+        {
+            var unsupportedHandler = new QueueHandler();
+            await AssertThrowsAsync<BadRequestException>(
+                () => new SalesOrdersService(CreateService(unsupportedHandler, CompanyA))
+                    .GetSalesOrdersAsync(new PagedRequest { SortField = unsupportedSort }),
+                $"unsupported sales order sort {unsupportedSort}");
+            Assert(unsupportedHandler.Requests.Count == 0, $"unsupported sales order sort {unsupportedSort} rejected before BC request");
+        }
     }
 
     private async Task InvoiceListAndDetailAreSeparatedAsync()
     {
         var handler = new QueueHandler(
             Json("{\"value\":[]}"),
-            Json("{\"value\":[{\"invoiceNo\":\"INV-1\",\"SalesInvoiceLines\":[]}]}"));
+            Json("{\"value\":[{\"invoiceNo\":\"INV-1\",\"salesInvoiceLines\":[]}]}"));
         var invoices = new SalesInvoicesService(CreateService(handler, CompanyA));
 
         await invoices.GetSalesInvoicesAsync(new PagedRequest());
@@ -239,7 +271,7 @@ internal sealed class PagingTests
         Assert(!listQuery.Contains("$expand", StringComparison.OrdinalIgnoreCase), "invoice list has no expand");
         Assert(!listQuery.Contains("base64", StringComparison.OrdinalIgnoreCase), "invoice list excludes base64");
         Assert(detailQuery.Contains("$top=1"), "invoice detail is limited to one");
-        Assert(detailQuery.Contains("$expand=SalesInvoiceLines"), "invoice detail expands lines");
+        Assert(detailQuery.Contains("$expand=salesInvoiceLines"), "invoice detail expands the metadata-proven navigation");
         Assert(detailQuery.Contains("salesPerson eq 'SP001'"), "invoice detail applies salesperson scope");
     }
 
@@ -312,40 +344,65 @@ internal sealed class PagingTests
         await invoices.GetSalesInvoicesAsync(new PagedRequest
         {
             Search = "INV-1",
-            SortField = "outstandingAmount",
+            SortField = "invoiceDate",
             SortDirection = "desc",
             Filters = new Dictionary<string, string?>
             {
                 ["customerCode"] = "C-1",
-                ["salesOrderNumber"] = "SO-1",
-                ["invoiceStatus"] = "Posted",
-                ["paymentStatus"] = "Unpaid",
-                ["dueDateFrom"] = "2026-10-01",
-                ["dueDateTo"] = "2026-10-31",
-                ["outstandingOnly"] = "true"
+                ["salespersonCode"] = "SP001"
             }
         });
 
         var query = DecodedQuery(handler);
         Assert(query.Contains("contains(invoiceNo,'INV-1')"), "invoice server search");
-        Assert(query.Contains("sellToCustomerNo eq 'C-1'"), "invoice customer filter");
-        Assert(query.Contains("salesOrderNo eq 'SO-1'"), "invoice sales order number filter");
-        Assert(query.Contains("status eq 'Posted'"), "invoice status filter");
-        Assert(query.Contains("paymentStatus eq 'Unpaid'"), "invoice payment status filter");
-        Assert(query.Contains("dueDate ge 2026-10-01"), "invoice due-date from filter");
-        Assert(query.Contains("dueDate le 2026-10-31"), "invoice due-date to filter");
-        Assert(query.Contains("outstandingAmount gt 0"), "invoice outstanding predicate");
-        Assert(query.Contains("$orderby=outstandingAmount desc"), "invoice supported sort alias");
+        Assert(!query.Contains("contains(customerCode", StringComparison.OrdinalIgnoreCase), "invoice search does not OR distinct CVT fields");
+        Assert(query.Contains("customerCode eq 'C-1'"), "invoice customer filter");
+        Assert(query.Contains("salesPerson eq 'SP001'"), "invoice salesperson filter");
+        Assert(query.Contains("$orderby=invoiceDate desc"), "invoice date sort");
+        Assert(!query.Contains("postingDate", StringComparison.OrdinalIgnoreCase), "invoice queries never generate postingDate");
+        Assert(!query.Contains("dueDate", StringComparison.OrdinalIgnoreCase), "invoice queries never generate dueDate");
 
-        var unsupportedHandler = new QueueHandler();
+        foreach (var unsupportedFilter in new[]
+        {
+            "salesOrderNumber", "invoiceStatus", "paymentStatus", "dueDateFrom", "dueDateTo", "outstandingOnly"
+        })
+        {
+            var unsupportedHandler = new QueueHandler();
+            await AssertThrowsAsync<BadRequestException>(
+                () => new SalesInvoicesService(CreateService(unsupportedHandler, CompanyA))
+                    .GetSalesInvoicesAsync(new PagedRequest
+                    {
+                        Filters = new Dictionary<string, string?> { [unsupportedFilter] = "x" }
+                    }),
+                $"unsupported invoice filter {unsupportedFilter}");
+            Assert(unsupportedHandler.Requests.Count == 0, $"unsupported filter {unsupportedFilter} rejected before BC request");
+        }
+
+        foreach (var unsupportedSort in new[]
+        {
+            "salesOrderNumber", "dueDate", "totalAmount", "paidAmount", "outstandingAmount", "paymentStatus", "invoiceStatus", "netAmount"
+        })
+        {
+            var unsupportedHandler = new QueueHandler();
+            await AssertThrowsAsync<BadRequestException>(
+                () => new SalesInvoicesService(CreateService(unsupportedHandler, CompanyA))
+                    .GetSalesInvoicesAsync(new PagedRequest
+                    {
+                        SortField = unsupportedSort
+                    }),
+                $"unsupported invoice sort {unsupportedSort}");
+            Assert(unsupportedHandler.Requests.Count == 0, $"unsupported sort {unsupportedSort} rejected before BC request");
+        }
+
+        var unknownHandler = new QueueHandler();
         await AssertThrowsAsync<BadRequestException>(
-            () => new SalesInvoicesService(CreateService(unsupportedHandler, CompanyA))
+            () => new SalesInvoicesService(CreateService(unknownHandler, CompanyA))
                 .GetSalesInvoicesAsync(new PagedRequest
                 {
                     Filters = new Dictionary<string, string?> { ["notAField"] = "x" }
                 }),
             "unsupported invoice filter");
-        Assert(unsupportedHandler.Requests.Count == 0, "unsupported filter rejected before BC request");
+        Assert(unknownHandler.Requests.Count == 0, "unsupported filter rejected before BC request");
     }
 
     private async Task CollectionEndpointsUseExactCustomSchemasAsync()
@@ -359,7 +416,7 @@ internal sealed class PagingTests
         var orders = await new SalesOrdersService(CreateService(orderHandler, CompanyA))
             .GetSalesOrdersAsync(new PagedRequest());
         AssertAufaitPath(orderHandler, "/salesOrders", "sales orders");
-        Assert(orders.Items.Single().No == "SO-1", "sales order number maps to public no property");
+        Assert(orders.Items.Single().Number == "SO-1", "sales order number uses the exact BC property");
         AssertNoQueryOption(orderHandler, "$select", "sales orders select");
         AssertNoQueryOption(orderHandler, "$orderby", "sales orders orderby");
         AssertNoQueryOption(orderHandler, "$filter", "sales orders filter");
@@ -377,14 +434,21 @@ internal sealed class PagingTests
         await new SalespersonsService(CreateService(salespersonHandler, CompanyA))
             .GetSalespersonsAsync(new PagedRequest
             {
-                SortField = "phoneNumber",
+                SortField = "email",
                 SortDirection = "asc"
             });
         AssertCvtPath(salespersonHandler, "/salespersons", "salespersons");
         var salespersonQuery = DecodedQuery(salespersonHandler);
-        Assert(salespersonQuery.Contains("$select=code,name,email,phone"), "salespersons use metadata-proven contact fields");
+        Assert(salespersonQuery.Contains("$select=code,name,email,phone,mdmCode"), "salespersons use metadata-proven fields");
         Assert(!salespersonQuery.Contains("phoneNo", StringComparison.OrdinalIgnoreCase), "salespersons exclude nonexistent phoneNo");
-        Assert(salespersonQuery.Contains("$orderby=phone asc"), "salesperson phone sort alias");
+        Assert(salespersonQuery.Contains("$orderby=email asc"), "salesperson email sort");
+
+        var phoneSortHandler = new QueueHandler();
+        await AssertThrowsAsync<BadRequestException>(
+            () => new SalespersonsService(CreateService(phoneSortHandler, CompanyA))
+                .GetSalespersonsAsync(new PagedRequest { SortField = "phoneNumber" }),
+            "unsupported salesperson phone sort");
+        Assert(phoneSortHandler.Requests.Count == 0, "unsupported salesperson phone sort rejected before BC request");
 
         var dimensionHandler = new QueueHandler(Json("{\"value\":[]}"));
         await new DimensionsService(CreateService(dimensionHandler, CompanyA))
